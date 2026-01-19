@@ -1,0 +1,113 @@
+:root {
+  /* Colors */
+  --color-primary: #bfbf2a;
+  /* Yellow/Gold from Login Button */
+  --color-primary-dark: #a6a624;
+  --color-secondary: #14246c;
+  /* Dark Blue from Dashboard Gradient */
+  --color-bg-gray: #d9d9d9;
+  --color-bg-light: #edf0f2;
+  --color-text-main: #000000;
+  --color-text-secondary: rgba(0, 0, 0, 0.68);
+  --color-white: #ffffff;
+  --color-danger: #ea4848;
+  --color-success: #2e7d32;
+  --color-warning: #ef6c00;
+  --color-info: #1565c0;
+
+  /* Spacing */
+  --spacing-xs: 5px;
+  --spacing-sm: 10px;
+  --spacing-md: 20px;
+  --spacing-lg: 30px;
+  --spacing-xl: 50px;
+
+  /* Typography */
+  --font-family-body: 'Inter', sans-serif;
+  --font-family-heading: 'Poppins', sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-family-body);
+  background-color: var(--color-bg-light);
+  color: var(--color-text-main);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--font-family-heading);
+}
+
+button {
+  cursor: pointer;
+  border: none;
+  font-family: var(--font-family-heading);
+}
+
+input {
+  font-family: var(--font-family-body);
+}
+
+.text-center {
+  text-align: center;
+}
+
+.w-full {
+  width: 100%;
+}
+
+.flex {
+  display: flex;
+}
+
+.flex-col {
+  flex-direction: column;
+}
+
+.items-center {
+  align-items: center;
+}
+
+.justify-center {
+  justify-content: center;
+}
+
+.gap-2 {
+  gap: 0.5rem;
+}
+
+.gap-4 {
+  gap: 1rem;
+}
+
+/* Placeholder Page Styles */
+.page-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  font-size: 24px;
+  font-family: var(--font-family-heading);
+  color: var(--color-text-secondary);
+  background-color: var(--color-bg-light);
+  margin-left: 260px;
+  transition: margin-left 0.3s ease;
+}
+
+@media (max-width: 768px) {
+  .page-placeholder {
+    margin-left: 0;
+  }
+}

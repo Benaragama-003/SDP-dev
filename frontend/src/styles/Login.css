@@ -1,0 +1,264 @@
+.login-page {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    background-color: #f5f5f5;
+    /* Fallback/Base bg */
+    padding: 20px;
+}
+
+.login-card {
+    background-color: #d9d9d9;
+    border-radius: 50px;
+    box-shadow: 0px 4px 4px 0px rgba(0, 0, 0, 0.25);
+    width: 100%;
+    max-width: 1440px;
+    /* Max width from design */
+    height: auto;
+    height: auto;
+    min-height: 600px;
+    /* Reduced from 800px to fit better */
+    display: flex;
+    flex-direction: row;
+    overflow: hidden;
+    position: relative;
+}
+
+/* Left side (Image/Branding) - assuming the design has a split or centered layout based on the code analysis */
+/* From the Figma code: It seems to be a single large card with absolute positioning in the original, but for responsive web we should use Flexbox/Grid. 
+   The design snippet shows:
+   - "Hidellana Distributors" text
+   - "Login to DMS System" text
+   - Inputs for Email, Password
+   - Login Button
+*/
+
+.login-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    padding: 40px;
+    text-align: center;
+}
+
+.brand-section {
+    margin-bottom: 40px;
+}
+
+.brand-title {
+    font-family: 'Poppins', sans-serif;
+    font-style: italic;
+    font-weight: 400;
+    font-size: 32px;
+    color: #000;
+    margin-bottom: 10px;
+}
+
+.login-heading {
+    font-family: 'Inter', sans-serif;
+    font-size: 25px;
+    margin-bottom: 10px;
+}
+
+.login-subheading {
+    font-family: 'Poppins', sans-serif;
+    font-weight: 300;
+    /* Light */
+    font-size: 16px;
+    margin-bottom: 40px;
+}
+
+.login-form {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    width: 100%;
+    max-width: 410px;
+    /* From Figma: w-[410px] */
+    align-items: flex-start;
+    /* Labels are left aligned */
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    width: 100%;
+    text-align: left;
+}
+
+.form-label {
+    font-family: 'Poppins', sans-serif;
+    font-size: 16px;
+    color: #101540;
+}
+
+.form-input {
+    width: 100%;
+    height: 60px;
+    background-color: #edf0f2;
+    border: 1px solid #8f8f8f;
+    border-radius: 5px;
+    padding: 15px;
+    font-size: 15px;
+    color: #000;
+    outline: none;
+}
+
+.form-input::placeholder {
+    color: rgba(0, 0, 0, 0.68);
+}
+
+.login-button {
+    width: 100%;
+    height: 60px;
+    background-color: #bfbf2a;
+    border: 1px solid #8f8f8f;
+    border-radius: 20px;
+    color: white;
+    font-family: 'Poppins', sans-serif;
+    font-size: 15px;
+    margin-top: 20px;
+    transition: background-color 0.2s;
+}
+
+.login-button:hover {
+    background-color: #a6a624;
+}
+
+/* Responsive Adjustments */
+@media (max-width: 768px) {
+    .login-card {
+        border-radius: 20px;
+        min-height: auto;
+        padding: 20px 0;
+    }
+
+    .brand-title {
+        font-size: 24px;
+    }
+
+    .login-heading {
+        font-size: 20px;
+    }
+}
+
+.success-message {
+    background-color: #e8f5e9;
+    color: #2e7d32;
+    padding: 12px 16px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    width: 100%;
+    max-width: 410px;
+    font-size: 14px;
+    border-left: 4px solid #2e7d32;
+}
+
+.error-message {
+    background-color: #ffebee;
+    color: #c62828;
+    padding: 12px 16px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    width: 100%;
+    max-width: 410px;
+    font-size: 14px;
+    border-left: 4px solid #c62828;
+}
+
+.register-link {
+    margin-top: 20px;
+    font-family: 'Poppins', sans-serif;
+    font-size: 14px;
+    color: #333;
+}
+
+.register-link a {
+    color: var(--color-primary);
+    text-decoration: none;
+    font-weight: 500;
+}
+
+.register-link a:hover {
+    text-decoration: underline;
+}
+
+.login-footer {
+    margin-top: 30px;
+    width: 100%;
+    max-width: 410px;
+}
+
+.footer-divider {
+    display: flex;
+    align-items: center;
+    margin: 20px 0;
+    color: #999;
+    font-size: 14px;
+}
+
+.footer-divider::before,
+.footer-divider::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background-color: #ddd;
+}
+
+.footer-divider span {
+    padding: 0 15px;
+}
+
+.admin-login-link {
+    display: block;
+    width: 100%;
+    padding: 14px 24px;
+    background-color: var(--color-secondary);
+    color: white;
+    text-align: center;
+    border-radius: 20px;
+    text-decoration: none;
+    font-family: 'Poppins', sans-serif;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.2s;
+}
+
+.admin-login-link:hover {
+    background-color: #0f1a50;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.test-credentials-info {
+    background-color: #e3f2fd;
+    border-left: 4px solid #1976d2;
+    padding: 12px 16px;
+    margin-bottom: 20px;
+    border-radius: 4px;
+    width: 100%;
+    max-width: 410px;
+    text-align: left;
+}
+
+.login-mode-switch {
+    margin-top: 15px;
+    text-align: center;
+}
+
+.switch-link {
+    color: var(--color-secondary);
+    font-size: 14px;
+    text-decoration: none;
+    font-family: var(--font-family-body);
+    transition: color 0.2s;
+}
+
+.switch-link:hover {
+    color: var(--color-primary);
+    text-decoration: underline;
+}
