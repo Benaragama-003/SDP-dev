@@ -1,3 +1,5 @@
+d@import './styles/Components.css';
+
 :root {
   /* Colors */
   --color-primary: #bfbf2a;
