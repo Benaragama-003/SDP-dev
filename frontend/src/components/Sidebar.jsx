@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import {
     LayoutDashboard,
@@ -11,7 +11,8 @@ import {
     Menu,
     X,
     LogOut,
-    ChevronRight
+    ChevronRight,
+    Settings
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import '../styles/Sidebar.css';
@@ -35,6 +36,11 @@ const Sidebar = () => {
         setIsMobileOpen(!isMobileOpen);
     };
 
+    useEffect(() => {
+        document.body.classList.toggle('sidebar-collapsed', isCollapsed);
+        return () => document.body.classList.remove('sidebar-collapsed');
+    }, [isCollapsed]);
+
     const navItems = [
         { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
         { path: '/inventory', icon: Package, label: 'Inventory' },
@@ -44,6 +50,7 @@ const Sidebar = () => {
         { path: '/credit/collection', icon: CreditCard, label: 'Credit Collection' },
         { path: '/dispatch/view', icon: Truck, label: 'Dispatch' },
         { path: '/sales/view', icon: TrendingUp, label: 'Daily Sales' },
+        { path: '/account-settings', icon: Settings, label: 'Account Settings' },
     ];
 
     return (

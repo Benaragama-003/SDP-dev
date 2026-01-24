@@ -7,7 +7,7 @@ const Login = () => {
     const navigate = useNavigate();
     const location = useLocation();
     const { login } = useAuth();
-    const [email, setEmail] = useState('');
+    const [credential, setCredential] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
@@ -22,8 +22,8 @@ const Login = () => {
         setError('');
         setSuccessMessage('');
 
-        if (!email || !password) {
-            setError('Please enter both email and password');
+        if (!credential || !password) {
+            setError('Please enter both username/email and password');
             return;
         }
 
@@ -31,7 +31,7 @@ const Login = () => {
 
         try {
             const requestedRole = isAdminLogin ? 'admin' : 'supervisor';
-            await login(email, password, requestedRole);
+            await login(credential, password, requestedRole);
             navigate('/dashboard');
         } catch (err) {
             setError(err.message);
@@ -75,13 +75,13 @@ const Login = () => {
 
                     <form className="login-form" onSubmit={handleLogin}>
                         <div className="form-group">
-                            <label className="form-label">Email*</label>
+                            <label className="form-label">Username or Email*</label>
                             <input
-                                type="email"
+                                type="text"
                                 className="form-input"
-                                placeholder="Enter your email"
-                                value={email}
-                                onChange={(e) => setEmail(e.target.value)}
+                                placeholder="Enter your username or email"
+                                value={credential}
+                                onChange={(e) => setCredential(e.target.value)}
                                 required
                             />
                         </div>
@@ -102,6 +102,10 @@ const Login = () => {
                             {loading ? 'Logging in...' : 'Login'}
                         </button>
                     </form>
+
+                    <div className="forgot-password-link">
+                        <Link to="/forgot-password">Forgot Password?</Link>
+                    </div>
 
                     <div className="register-link">
                         Don't have an account? <Link to="/register">Register here</Link>

@@ -1,6 +1,7 @@
 CREATE TABLE users (
     user_id VARCHAR(20) PRIMARY KEY,
     username VARCHAR(50) UNIQUE NOT NULL,
+    full_name VARCHAR(100),
     password_hash VARCHAR(255) NOT NULL,  
     email VARCHAR(100),
     phone_number VARCHAR(15),
@@ -10,6 +11,8 @@ CREATE TABLE users (
     last_login DATETIME,
     created_by VARCHAR(20),
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    reset_token VARCHAR(255),
+    reset_token_expires DATETIME,
     FOREIGN KEY (created_by) REFERENCES users(user_id)
 );
 
