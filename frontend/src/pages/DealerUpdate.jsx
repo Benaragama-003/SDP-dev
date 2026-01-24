@@ -16,7 +16,8 @@ const DealerUpdate = () => {
         address: '',
         route: '',
         creditLimit: '',
-        email: ''
+        email: '',
+        status: 'active'
     });
 
     useEffect(() => {
@@ -27,7 +28,8 @@ const DealerUpdate = () => {
             address: '123 Main St, Colombo',
             route: 'Route A',
             creditLimit: '50000',
-            email: 'abc@example.com'
+            email: 'abc@example.com',
+            status: 'active'
         });
     }, [id]);
 
@@ -106,6 +108,13 @@ const DealerUpdate = () => {
                                     onChange={handleChange}
                                     required
                                 />
+                            </div>
+                            <div className="form-field">
+                                <label>Status*</label>
+                                <select name="status" value={dealerData.status} onChange={handleChange} required>
+                                    <option value="active">Active</option>
+                                    <option value="inactive">Inactive</option>
+                                </select>
                             </div>
                             <div className="form-field full-width">
                                 <label>Address*</label>

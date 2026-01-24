@@ -9,7 +9,7 @@ const Inventory = () => {
 
     // Mock grouped inventory data (Same as admin)
     const inventoryGrouped = [
-        { size: '2.3 kg', filled: 50, empty: 30, damaged: 5, newCount: 20 },
+        { size: '2.0 kg', filled: 50, empty: 30, damaged: 5, newCount: 20 },
         { size: '5.0 kg', filled: 150, empty: 80, damaged: 12, newCount: 45 },
         { size: '12.5 kg', filled: 200, empty: 120, damaged: 8, newCount: 60 },
         { size: '37.5 kg', filled: 100, empty: 60, damaged: 4, newCount: 25 },

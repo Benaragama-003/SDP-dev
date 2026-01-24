@@ -134,7 +134,7 @@ const InvoiceView = () => {
                 {/* Harmonized Invoice View Modal */}
                 {showModal && selectedInvoice && (
                     <div className="modal-overlay" onClick={() => setShowModal(false)}>
-                        <div className="modal-content" onClick={e => e.stopPropagation()} style={{ backgroundColor: '#fff', borderRadius: '25px', maxWidth: '700px', padding: '0', overflow: 'hidden', boxShadow: '0 20px 45px rgba(0,0,0,0.2)' }}>
+                        <div className="modal-content" onClick={e => e.stopPropagation()} style={{ backgroundColor: '#fff', borderRadius: '25px', maxWidth: '700px', maxHeight: '90vh', padding: '0', boxShadow: '0 20px 45px rgba(0,0,0,0.2)', overflowY: 'auto' }}>
                             <div className="modal-header" style={{ padding: '25px 30px', borderBottom: '1px solid #f0f0f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#fcfcfc' }}>
                                 <div>
                                     <h1 style={{ fontSize: '22px', fontWeight: 'bold', margin: '0', color: '#101540' }}>Invoice Details</h1>
@@ -207,17 +207,45 @@ const InvoiceView = () => {
                                     </div>
                                 </div>
 
-                                <div style={{ display: 'flex', gap: '20px' }}>
+                                <div style={{ display: 'flex', gap: '15px', justifyContent: 'space-between' }}>
                                     <button
                                         className="btn"
-                                        style={{ flex: 1, backgroundColor: '#dc3545', color: 'white', padding: '16px', borderRadius: '15px', fontWeight: 'bold', fontSize: '16px', border: 'none', cursor: 'pointer', boxShadow: '0 5px 15px rgba(220, 53, 69, 0.2)' }}
+                                        style={{
+                                            flex: 1,
+                                            backgroundColor: '#dc3545',
+                                            color: 'white',
+                                            padding: '16px 20px',
+                                            borderRadius: '15px',
+                                            fontWeight: 'bold',
+                                            fontSize: '16px',
+                                            border: 'none',
+                                            cursor: 'pointer',
+                                            boxShadow: '0 5px 15px rgba(220, 53, 69, 0.2)',
+                                            transition: 'all 0.2s ease'
+                                        }}
                                         onClick={() => setShowModal(false)}
                                     >
                                         Close Portal
                                     </button>
                                     <button
                                         className="btn"
-                                        style={{ flex: 1.2, backgroundColor: '#bfbf2a', color: 'white', padding: '16px', borderRadius: '15px', fontWeight: 'bold', fontSize: '16px', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', boxShadow: '0 5px 15px rgba(191, 191, 42, 0.2)' }}
+                                        style={{
+                                            flex: 1,
+                                            backgroundColor: '#bfbf2a',
+                                            color: 'white',
+                                            padding: '16px 20px',
+                                            borderRadius: '15px',
+                                            fontWeight: 'bold',
+                                            fontSize: '16px',
+                                            border: 'none',
+                                            cursor: 'pointer',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            gap: '10px',
+                                            boxShadow: '0 5px 15px rgba(191, 191, 42, 0.2)',
+                                            transition: 'all 0.2s ease'
+                                        }}
                                     >
                                         <Download size={20} /> Download PDF
                                     </button>

@@ -13,10 +13,6 @@ const Login = () => {
     const [loading, setLoading] = useState(false);
     const [successMessage, setSuccessMessage] = useState(location.state?.message || '');
 
-    // Check if admin login mode
-    const searchParams = new URLSearchParams(location.search);
-    const isAdminLogin = searchParams.get('role') === 'admin';
-
     const handleLogin = async (e) => {
         e.preventDefault();
         setError('');
@@ -30,8 +26,7 @@ const Login = () => {
         setLoading(true);
 
         try {
-            const requestedRole = isAdminLogin ? 'admin' : 'supervisor';
-            await login(credential, password, requestedRole);
+            await login(credential, password);
             navigate('/dashboard');
         } catch (err) {
             setError(err.message);
@@ -48,18 +43,8 @@ const Login = () => {
                         <h1 className="brand-title">Hidellana Distributors</h1>
                     </div>
 
-                    <h2 className="login-heading">
-                        {isAdminLogin ? 'Administrator Login' : 'Supervisor Login'}
-                    </h2>
+                    <h2 className="login-heading">GDMS - Login</h2>
                     <p className="login-subheading">Enter your credentials to access the system.</p>
-
-                    {isAdminLogin && (
-                        <div className="login-mode-switch">
-                            <Link to="/login" className="switch-link">
-                                ← Back to Supervisor Login
-                            </Link>
-                        </div>
-                    )}
 
                     {successMessage && (
                         <div className="success-message">
@@ -110,17 +95,6 @@ const Login = () => {
                     <div className="register-link">
                         Don't have an account? <Link to="/register">Register here</Link>
                     </div>
-
-                    {!isAdminLogin && (
-                        <div className="login-footer">
-                            <div className="footer-divider">
-                                <span>OR</span>
-                            </div>
-                            <Link to="/login?role=admin" className="admin-login-link">
-                                Login as Administrator
-                            </Link>
-                        </div>
-                    )}
                 </div>
             </div>
         </div>

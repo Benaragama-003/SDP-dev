@@ -7,10 +7,10 @@ const SupervisorCredit = () => {
     const [searchTerm, setSearchTerm] = useState('');
 
     const [creditAccounts, setCreditAccounts] = useState([
-        { id: 'CR-001', dealer: 'ABC Stores', totalCredit: 125000, used: 75000, available: 50000, overdue: 0, status: 'active' },
-        { id: 'CR-002', dealer: 'XYZ Mart', totalCredit: 200000, used: 180000, available: 20000, overdue: 0, status: 'active' },
+        { id: 'CR-001', dealer: 'ABC Stores', totalCredit: 125000, used: 75000, available: 50000, overdue: 0, status: 'pending' },
+        { id: 'CR-002', dealer: 'XYZ Mart', totalCredit: 200000, used: 180000, available: 20000, overdue: 0, status: 'pending' },
         { id: 'CR-003', dealer: 'LMN Distributors', totalCredit: 150000, used: 160000, available: 0, overdue: 10000, status: 'overdue' },
-        { id: 'CR-004', dealer: 'PQR Suppliers', totalCredit: 100000, used: 45000, available: 55000, overdue: 0, status: 'active' },
+        { id: 'CR-004', dealer: 'PQR Suppliers', totalCredit: 100000, used: 45000, available: 55000, overdue: 0, status: 'pending' },
     ]);
     const [selectedAccount, setSelectedAccount] = useState(null);
     const [showSettleModal, setShowSettleModal] = useState(false);
@@ -47,7 +47,7 @@ const SupervisorCredit = () => {
                     used: newUsed,
                     available: acc.totalCredit - newUsed,
                     overdue: newOverdue,
-                    status: newOverdue > 0 ? 'overdue' : 'active'
+                    status: newOverdue > 0 ? 'overdue' : 'pending'
                 };
             }
             return acc;
@@ -116,17 +116,17 @@ const SupervisorCredit = () => {
                             </div>
                         </div>
                         <div className="table-responsive">
-                            <table className="data-table">
+                            <table className="data-table" style={{ width: '100%' }}>
                                 <thead>
                                     <tr>
-                                        <th>Account ID</th>
-                                        <th>Dealer</th>
-                                        <th>Credit Limit</th>
-                                        <th>Used</th>
-                                        <th>Available</th>
-                                        <th>Overdue</th>
-                                        <th>Status</th>
-                                        <th style={{ width: '220px', textAlign: 'center' }}>Actions</th>
+                                        <th style={{ width: '90px' }}>Account ID</th>
+                                        <th style={{ width: '150px' }}>Dealer</th>
+                                        <th style={{ width: '110px' }}>Credit Limit</th>
+                                        <th style={{ width: '100px' }}>Used</th>
+                                        <th style={{ width: '100px' }}>Available</th>
+                                        <th style={{ width: '90px' }}>Overdue</th>
+                                        <th style={{ width: '100px' }}>Status</th>
+                                        <th style={{ width: '150px', minWidth: '150px', textAlign: 'center' }}>Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -141,24 +141,25 @@ const SupervisorCredit = () => {
                                                 Rs. {account.overdue.toLocaleString()}
                                             </td>
                                             <td>
-                                                <span className={`badge ${account.status === 'active' ? 'badge-success' : 'badge-danger'}`}>
+                                                <span className={`badge ${account.status === 'pending' ? 'badge-warning' : 'badge-danger'}`}>
                                                     {account.status.charAt(0).toUpperCase() + account.status.slice(1)}
                                                 </span>
                                             </td>
                                             <td>
-                                                <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
+                                                <div style={{ display: 'flex', gap: '5px', justifyContent: 'center', flexWrap: 'nowrap' }}>
                                                     <button
                                                         className="btn btn-sm"
                                                         style={{
                                                             backgroundColor: '#bfbf2a',
                                                             color: 'white',
                                                             border: 'none',
-                                                            padding: '6px 14px',
-                                                            borderRadius: '8px',
-                                                            fontSize: '13px',
+                                                            padding: '6px 12px',
+                                                            borderRadius: '6px',
+                                                            fontSize: '12px',
                                                             fontWeight: '600',
-                                                            minWidth: '75px',
-                                                            cursor: 'pointer'
+                                                            minWidth: '50px',
+                                                            cursor: 'pointer',
+                                                            whiteSpace: 'nowrap'
                                                         }}
                                                         onClick={() => { setSelectedAccount(account); setShowSettleModal(true); }}
                                                     >
@@ -170,12 +171,13 @@ const SupervisorCredit = () => {
                                                             backgroundColor: '#101540',
                                                             color: 'white',
                                                             border: 'none',
-                                                            padding: '6px 14px',
-                                                            borderRadius: '8px',
-                                                            fontSize: '13px',
-                                                            fontWeight: '600',
-                                                            minWidth: '75px',
-                                                            cursor: 'pointer'
+                                                            padding: '6px 12px',
+                                                            borderRadius: '6px',
+                                                            fontSize: '11px',
+                                                            fontWeight: '500',
+                                                            minWidth: '50px',
+                                                            cursor: 'pointer',
+                                                            whiteSpace: 'nowrap'
                                                         }}
                                                         onClick={() => { setSelectedAccount(account); setShowHistoryModal(true); }}
                                                     >

@@ -45,22 +45,11 @@ export const AuthProvider = ({ children }) => {
         verifySession();
     }, []);
 
-    // Real login function
-    const login = async (username, password, requestedRole = 'supervisor') => {
+    // Unified login function
+    const login = async (username, password) => {
         try {
             const response = await api.post('/auth/login', { username, password });
             const { user: userData, token } = response.data.data;
-
-            // Check if user's role matches requested role (case-insensitive comparison for safety)
-            const userRole = userData.role.toLowerCase();
-            const targetRole = requestedRole.toLowerCase();
-
-            if (userRole !== targetRole) {
-                console.log(`Auth Error: Role mismatch. User has "${userRole}", expected "${targetRole}"`);
-                const displayRole = targetRole.charAt(0).toUpperCase() + targetRole.slice(1);
-                const actualRole = userRole.charAt(0).toUpperCase() + userRole.slice(1);
-                throw new Error(`This account has ${actualRole} privileges. Please use the ${actualRole} login page.`);
-            }
 
             const userSession = {
                 ...userData,
