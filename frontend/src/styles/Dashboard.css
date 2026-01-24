@@ -121,24 +121,21 @@ body.sidebar-collapsed .dispatch-container {
 
 /* Mobile Responsiveness */
 @media (max-width: 768px) {
-    .dashboard-container {
-        margin-left: 0;
+
+    .dashboard-container,
+    .inventory-container,
+    .dealers-container,
+    .invoice-container,
+    .dispatch-container,
+    .settings-container {
+        margin-left: 0 !important;
     }
 
-    .dashboard-main {
+    .dashboard-main,
+    .settings-main {
         padding: 20px;
-    }
-
-    .dashboard-banner {
-        padding: 20px;
-    }
-
-    .banner-title {
-        font-size: 24px;
-    }
-
-    .stats-grid {
-        grid-template-columns: 1fr;
+        padding-top: 80px;
+        /* Account for mobile menu button */
     }
 }
 

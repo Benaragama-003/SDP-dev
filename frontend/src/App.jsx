@@ -11,6 +11,9 @@ import InvoiceView from './pages/InvoiceView';
 import Dealers from './pages/Dealers';
 import DealerAdd from './pages/DealerAdd';
 import DealerUpdate from './pages/DealerUpdate';
+import ForgotPassword from './pages/ForgotPassword';
+import ResetPassword from './pages/ResetPassword';
+import AccountSettings from './pages/AccountSettings';
 
 // Admin Modules
 import AdminInventory from './pages/admin/AdminInventory';
@@ -39,11 +42,19 @@ function App() {
           {/* Public Routes */}
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
 
           {/* Protected Routes (Accessible by both unless specified) */}
           <Route path="/dashboard" element={
             <ProtectedRoute>
               <Dashboard />
+            </ProtectedRoute>
+          } />
+
+          <Route path="/account-settings" element={
+            <ProtectedRoute>
+              <AccountSettings />
             </ProtectedRoute>
           } />
 
