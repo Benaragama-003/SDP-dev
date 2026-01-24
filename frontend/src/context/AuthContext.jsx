@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import api from '../services/api';
 
 const AuthContext = createContext(null);
 
@@ -17,104 +17,97 @@ export const AuthProvider = ({ children }) => {
 
     // Check for existing session on mount
     useEffect(() => {
-        // Seed default admin user if none exists
-        const users = JSON.parse(localStorage.getItem('dms_users') || '[]');
-        const adminExists = users.some(u => u.role === 'admin');
+        const verifySession = async () => {
+            const token = localStorage.getItem('dms_token');
+            const storedUser = localStorage.getItem('dms_user');
 
-        if (!adminExists) {
-            const defaultAdmin = {
-                id: 'admin-001',
-                name: 'System Administrator',
-                email: 'admin@hidellana.lk',
-                password: 'admin123',
-                role: 'admin',
-                createdAt: new Date().toISOString()
-            };
-            users.push(defaultAdmin);
-            localStorage.setItem('dms_users', JSON.stringify(users));
-            console.log('✅ Default admin user created');
-        }
-
-        const storedUser = localStorage.getItem('dms_user');
-        if (storedUser) {
-            try {
-                setUser(JSON.parse(storedUser));
-            } catch (error) {
-                console.error('Error parsing stored user:', error);
-                localStorage.removeItem('dms_user');
-            }
-        }
-        setLoading(false);
-    }, []);
-
-    // Mock login function
-    const login = async (email, password, requestedRole = 'supervisor') => {
-        // Simulate API call delay
-        return new Promise((resolve, reject) => {
-            setTimeout(() => {
-                // Check if user exists in mock database (localStorage)
-                const users = JSON.parse(localStorage.getItem('dms_users') || '[]');
-                const foundUser = users.find(u => u.email === email && u.password === password);
-
-                if (foundUser) {
-                    // Check if user's role matches requested role
-                    const userRole = foundUser.role || 'supervisor';
-                    if (userRole !== requestedRole) {
-                        reject(new Error(`Invalid credentials for ${requestedRole} login`));
-                        return;
-                    }
-
+            if (token && storedUser) {
+                try {
+                    // Optionally verify token with backend
+                    const response = await api.get('/auth/profile');
+                    const userData = response.data.data;
                     const userSession = {
-                        id: foundUser.id,
-                        name: foundUser.name,
-                        email: foundUser.email,
-                        role: userRole
+                        ...userData,
+                        name: userData.full_name || userData.username
                     };
                     setUser(userSession);
                     localStorage.setItem('dms_user', JSON.stringify(userSession));
-                    resolve({ success: true, user: userSession });
-                } else {
-                    reject(new Error('Invalid email or password'));
+                } catch (error) {
+                    console.error('Session verification failed:', error);
+                    localStorage.removeItem('dms_token');
+                    localStorage.removeItem('dms_user');
+                    setUser(null);
                 }
-            }, 500);
-        });
+            }
+            setLoading(false);
+        };
+
+        verifySession();
+    }, []);
+
+    // Real login function
+    const login = async (username, password, requestedRole = 'supervisor') => {
+        try {
+            const response = await api.post('/auth/login', { username, password });
+            const { user: userData, token } = response.data.data;
+
+            // Check if user's role matches requested role (case-insensitive comparison for safety)
+            const userRole = userData.role.toLowerCase();
+            const targetRole = requestedRole.toLowerCase();
+
+            if (userRole !== targetRole) {
+                console.log(`Auth Error: Role mismatch. User has "${userRole}", expected "${targetRole}"`);
+                const displayRole = targetRole.charAt(0).toUpperCase() + targetRole.slice(1);
+                const actualRole = userRole.charAt(0).toUpperCase() + userRole.slice(1);
+                throw new Error(`This account has ${actualRole} privileges. Please use the ${actualRole} login page.`);
+            }
+
+            const userSession = {
+                ...userData,
+                name: userData.full_name || userData.username
+            };
+
+            setUser(userSession);
+            localStorage.setItem('dms_token', token);
+            localStorage.setItem('dms_user', JSON.stringify(userSession));
+
+            return { success: true, user: userSession };
+        } catch (error) {
+            const message = error.response?.data?.message || error.message || 'Login failed';
+            throw new Error(message);
+        }
     };
 
-    // Mock register function
-    const register = async (name, email, password) => {
-        return new Promise((resolve, reject) => {
-            setTimeout(() => {
-                // Get existing users
-                const users = JSON.parse(localStorage.getItem('dms_users') || '[]');
+    // Real register function
+    const register = async (name, username, email, password, phone_number) => {
+        try {
+            const response = await api.post('/auth/register', {
+                username,
+                password,
+                email,
+                phone_number,
+                name // Note: backend schema might need 'name' if not already there, but let's send what we have
+            });
 
-                // Check if user already exists
-                if (users.some(u => u.email === email)) {
-                    reject(new Error('User with this email already exists'));
-                    return;
-                }
-
-                // Create new user
-                const newUser = {
-                    id: Date.now().toString(),
-                    name,
-                    email,
-                    password, // In real app, this would be hashed
-                    role: 'supervisor',
-                    createdAt: new Date().toISOString()
-                };
-
-                users.push(newUser);
-                localStorage.setItem('dms_users', JSON.stringify(users));
-
-                resolve({ success: true, message: 'Registration successful' });
-            }, 500);
-        });
+            return { success: true, message: 'Registration successful' };
+        } catch (error) {
+            const message = error.response?.data?.message || error.message || 'Registration failed';
+            throw new Error(message);
+        }
     };
 
     // Logout function
     const logout = () => {
         setUser(null);
+        localStorage.removeItem('dms_token');
         localStorage.removeItem('dms_user');
+    };
+
+    // Update profile function
+    const updateProfile = (updatedData) => {
+        const newUser = { ...user, ...updatedData };
+        setUser(newUser);
+        localStorage.setItem('dms_user', JSON.stringify(newUser));
     };
 
     const value = {
@@ -122,10 +115,11 @@ export const AuthProvider = ({ children }) => {
         login,
         register,
         logout,
+        updateProfile,
         loading,
         isAuthenticated: !!user,
-        isSupervisor: user?.role === 'supervisor',
-        isAdmin: user?.role === 'admin'
+        isSupervisor: user?.role?.toUpperCase() === 'SUPERVISOR',
+        isAdmin: user?.role?.toUpperCase() === 'ADMIN'
     };
 
     return (

@@ -14,7 +14,8 @@ import {
     ChevronRight,
     UserCog,
     DollarSign,
-    ShoppingCart
+    ShoppingCart,
+    Settings
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import '../styles/Sidebar.css';
@@ -55,6 +56,7 @@ const AdminSidebar = () => {
         { path: '/admin/sales', icon: TrendingUp, label: 'Sales' },
         { path: '/admin/cheques', icon: DollarSign, label: 'Cheques' },
         { path: '/admin/credit', icon: CreditCard, label: 'Credit' },
+        { path: '/account-settings', icon: Settings, label: 'Account Settings' },
     ];
 
     return (

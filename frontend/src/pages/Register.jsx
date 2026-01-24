@@ -8,7 +8,9 @@ const Register = () => {
     const { register } = useAuth();
     const [formData, setFormData] = useState({
         name: '',
+        username: '',
         email: '',
+        phone_number: '',
         password: '',
         confirmPassword: ''
     });
@@ -46,7 +48,13 @@ const Register = () => {
         setLoading(true);
 
         try {
-            await register(formData.name, formData.email, formData.password);
+            await register(
+                formData.name,
+                formData.username,
+                formData.email,
+                formData.password,
+                formData.phone_number
+            );
             navigate('/login', { state: { message: 'Registration successful! Please login.' } });
         } catch (err) {
             setError(err.message);
@@ -87,6 +95,19 @@ const Register = () => {
                         </div>
 
                         <div className="form-group">
+                            <label className="form-label">Username*</label>
+                            <input
+                                type="text"
+                                name="username"
+                                className="form-input"
+                                placeholder="Choose a username"
+                                value={formData.username}
+                                onChange={handleChange}
+                                required
+                            />
+                        </div>
+
+                        <div className="form-group">
                             <label className="form-label">Email*</label>
                             <input
                                 type="email"
@@ -96,6 +117,18 @@ const Register = () => {
                                 value={formData.email}
                                 onChange={handleChange}
                                 required
+                            />
+                        </div>
+
+                        <div className="form-group">
+                            <label className="form-label">Phone Number</label>
+                            <input
+                                type="text"
+                                name="phone_number"
+                                className="form-input"
+                                placeholder="Enter your 10-digit phone number"
+                                value={formData.phone_number}
+                                onChange={handleChange}
                             />
                         </div>
 
