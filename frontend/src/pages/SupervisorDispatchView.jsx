@@ -17,9 +17,10 @@ const SupervisorDispatchView = () => {
             route: 'Route A',
             status: 'in-progress',
             progress: {
-                '5kg': { loaded: 110, sold: 50, balance: 60 },
-                '12.5kg': { loaded: 140, sold: 100, balance: 40 },
-                '37.5kg': { loaded: 0, sold: 0, balance: 0 }
+                '2kg': { loaded: 50, sold: 20, damage: 0, balance: 30 },
+                '5kg': { loaded: 110, sold: 50, damage: 0, balance: 60 },
+                '12.5kg': { loaded: 140, sold: 100, damage: 0, balance: 40 },
+                '37.5kg': { loaded: 0, sold: 0, damage: 0, balance: 0 }
             }
         }
     ]);
@@ -149,46 +150,60 @@ const SupervisorDispatchView = () => {
                                     </div>
                                 )}
 
-                                <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr 1fr 1fr', gap: '15px', padding: '0 0 15px', borderBottom: '2px solid #f5f5f5', marginBottom: '20px', textAlign: 'center', color: '#999', fontSize: '13px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '1px' }}>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr 1fr 1fr 1fr', gap: '15px', padding: '0 0 15px', borderBottom: '2px solid #f5f5f5', marginBottom: '20px', textAlign: 'center', color: '#999', fontSize: '13px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '1px' }}>
                                     <div></div>
+                                    <div>2kg</div>
                                     <div>5kg</div>
                                     <div>12.5kg</div>
                                     <div>37.5kg</div>
                                 </div>
 
-                                {['loaded', 'sold', 'balance'].map((type) => (
-                                    <div key={type} style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr 1fr 1fr', gap: '15px', alignItems: 'center', marginBottom: '15px' }}>
+                                {['loaded', 'sold', 'damage', 'balance'].map((type) => (
+                                    <div key={type} style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr 1fr 1fr 1fr', gap: '15px', alignItems: 'center', marginBottom: '15px' }}>
                                         <div style={{ color: '#333', fontSize: '15px', fontWeight: '600', textAlign: 'right', paddingRight: '15px' }}>
                                             {type.charAt(0).toUpperCase() + type.slice(1)} Qty
                                         </div>
-                                        {['5kg', '12.5kg', '37.5kg'].map((size) => (
+                                        {['2kg', '5kg', '12.5kg', '37.5kg'].map((size) => (
                                             <div key={size} style={{
-                                                backgroundColor: type === 'balance' ? '#f0f4ff' : '#fff',
+                                                backgroundColor: type === 'balance' ? '#f0f4ff' : type === 'damage' ? '#fff5f5' : '#fff',
                                                 padding: '12px',
                                                 borderRadius: '12px',
                                                 textAlign: 'center',
                                                 fontSize: '16px',
                                                 fontWeight: '600',
-                                                color: type === 'balance' ? '#101540' : '#555',
+                                                color: type === 'balance' ? '#101540' : type === 'damage' ? '#dc3545' : '#555',
                                                 border: '1px solid #eee'
                                             }}>
-                                                {selectedDispatch.progress[size][type]}
+                                                {type === 'damage' ? (
+                                                    <input
+                                                        type="number"
+                                                        defaultValue={selectedDispatch.progress[size][type]}
+                                                        style={{ width: '100%', border: 'none', background: 'transparent', textAlign: 'center', fontWeight: 'inherit', color: 'inherit' }}
+                                                        onBlur={(e) => {
+                                                            const val = parseInt(e.target.value) || 0;
+                                                            // Logic for damage replacement: balance = loaded - sold - damage (but replacement means sold stays same?)
+                                                            // Actually, user said: "if a damage was found... he should replace that to a filled one... thats why"
+                                                            // So if 1 damage is found, it's 1 cylinder removed from 'loaded' but replaced (so net loaded unchanged, but damage logged).
+                                                            console.log(`Damage for ${size} updated to ${val}`);
+                                                        }}
+                                                    />
+                                                ) : selectedDispatch.progress[size][type]}
                                             </div>
                                         ))}
                                     </div>
                                 ))}
 
-                                <div style={{ marginTop: '40px', display: 'flex', gap: '15px' }}>
+                                <div style={{ marginTop: '20px', display: 'flex', gap: '15px' }}>
                                     <button
                                         onClick={() => { setShowProgressModal(false); setIsConfirmingCompletion(false); }}
-                                        style={{ flex: 1, backgroundColor: '#dc3545', border: 'none', padding: '15px', borderRadius: '15px', fontSize: '16px', color: 'white', cursor: 'pointer', fontWeight: '600' }}
+                                        style={{ flex: 1, backgroundColor: '#dc3545', border: 'none', padding: '12px', borderRadius: '15px', fontSize: '16px', color: 'white', cursor: 'pointer', fontWeight: '500' }}
                                     >
                                         {isConfirmingCompletion ? 'Cancel' : 'Close'}
                                     </button>
                                     {isConfirmingCompletion && (
                                         <button
                                             onClick={confirmCompletion}
-                                            style={{ flex: 1.5, backgroundColor: '#43e97b', border: 'none', padding: '15px', borderRadius: '15px', fontSize: '16px', color: '#101540', cursor: 'pointer', fontWeight: '700' }}
+                                            style={{ flex: 1, backgroundColor: '#43e97b', border: 'none', padding: '12px', borderRadius: '15px', fontSize: '16px', color: '#101540', cursor: 'pointer', fontWeight: '500' }}
                                         >
                                             Confirm & Finish
                                         </button>

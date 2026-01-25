@@ -7,12 +7,27 @@ const Inventory = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [showDamageModal, setShowDamageModal] = useState(false);
 
+    // Mock dealers data for the damage report modal
+    const [dealers] = useState([
+        { id: 'D001', name: 'A.N.G. Enterprises (Pvt) Ltd' },
+        { id: 'D002', name: 'Ratnapura Gas Center' },
+        { id: 'D003', name: 'Sabaragamuwa Dealers' },
+    ]);
+
+    // Form state for damage report
+    const [damageData, setDamageData] = useState({
+        productId: '',
+        dealerId: '',
+        quantity: '',
+        reason: ''
+    });
+
     // Mock grouped inventory data (Same as admin)
     const inventoryGrouped = [
-        { size: '2.0 kg', filled: 50, empty: 30, damaged: 5, newCount: 20 },
-        { size: '5.0 kg', filled: 150, empty: 80, damaged: 12, newCount: 45 },
-        { size: '12.5 kg', filled: 200, empty: 120, damaged: 8, newCount: 60 },
-        { size: '37.5 kg', filled: 100, empty: 60, damaged: 4, newCount: 25 },
+        { size: '2kg', filled: 50, empty: 30, damaged: 5, newCount: 20 },
+        { size: '5kg', filled: 150, empty: 80, damaged: 12, newCount: 45 },
+        { size: '12.5kg', filled: 200, empty: 120, damaged: 8, newCount: 60 },
+        { size: '37.5kg', filled: 100, empty: 60, damaged: 4, newCount: 25 },
     ];
 
     const filteredData = inventoryGrouped.filter((item) =>
@@ -21,8 +36,11 @@ const Inventory = () => {
 
     const handleDamageReport = (e) => {
         e.preventDefault();
-        alert('Damage Report Submitted Successfully!');
+        console.log('Damage Data Submitted:', damageData);
+        alert(`Damage Report for ${damageData.quantity} cylinders (${damageData.productId}) submitted successfully!`);
         setShowDamageModal(false);
+        // Reset form
+        setDamageData({ productId: '', dealerId: '', quantity: '', reason: '' });
     };
 
     return (
@@ -87,45 +105,78 @@ const Inventory = () => {
                 </main>
 
                 {/* Damage Report Modal (Simple Version for now) */}
-                {showDamageModal && (
-                    <div className="modal-overlay" onClick={() => setShowDamageModal(false)}>
-                        <div className="modal-content" onClick={e => e.stopPropagation()}>
-                            <div className="modal-header">
-                                <h2 className="modal-title">Report Damage Inventory</h2>
-                                <button className="modal-close" onClick={() => setShowDamageModal(false)}>×</button>
-                            </div>
-                            <form onSubmit={handleDamageReport}>
-                                <div className="modal-body">
-                                    <div className="form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '15px' }}>
-                                        <div className="form-field">
-                                            <label>Product (Cylinder Size)</label>
-                                            <select required>
-                                                <option value="">Select Size...</option>
-                                                {inventoryGrouped.map((item, idx) => (
-                                                    <option key={idx} value={item.size}>
-                                                        {item.size}
-                                                    </option>
-                                                ))}
-                                            </select>
-                                        </div>
-                                        <div className="form-field">
-                                            <label>Quantity Damaged</label>
-                                            <input type="number" required placeholder="0" min="1" />
-                                        </div>
-                                        <div className="form-field">
-                                            <label>Reason / Notes</label>
-                                            <textarea required placeholder="Describe the damage..." rows="3"></textarea>
+                {
+                    showDamageModal && (
+                        <div className="modal-overlay" onClick={() => setShowDamageModal(false)}>
+                            <div className="modal-content" onClick={e => e.stopPropagation()}>
+                                <div className="modal-header">
+                                    <h2 className="modal-title">Report Damage Inventory</h2>
+                                    <button className="modal-close" onClick={() => setShowDamageModal(false)}>×</button>
+                                </div>
+                                <form onSubmit={handleDamageReport}>
+                                    <div className="modal-body">
+                                        <div className="form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '15px' }}>
+                                            <div className="form-field">
+                                                <label>Product (Cylinder Size)</label>
+                                                <select
+                                                    required
+                                                    value={damageData.productId}
+                                                    onChange={(e) => setDamageData({ ...damageData, productId: e.target.value })}
+                                                >
+                                                    <option value="">Select Size...</option>
+                                                    {inventoryGrouped.map((item, idx) => (
+                                                        <option key={idx} value={item.size}>
+                                                            {item.size}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                            <div className="form-field">
+                                                <label>Dealer Who Reported (Optional)</label>
+                                                <select
+                                                    value={damageData.dealerId}
+                                                    onChange={(e) => setDamageData({ ...damageData, dealerId: e.target.value })}
+                                                >
+                                                    <option value="">Internal / No Dealer</option>
+                                                    {dealers.map(dealer => (
+                                                        <option key={dealer.id} value={dealer.id}>
+                                                            {dealer.name}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                            <div className="form-field">
+                                                <label>Quantity Damaged</label>
+                                                <input
+                                                    type="number"
+                                                    required
+                                                    placeholder="0"
+                                                    min="1"
+                                                    value={damageData.quantity}
+                                                    onChange={(e) => setDamageData({ ...damageData, quantity: e.target.value })}
+                                                />
+                                            </div>
+                                            <div className="form-field">
+                                                <label>Reason / Notes</label>
+                                                <textarea
+                                                    required
+                                                    placeholder="Describe the damage..."
+                                                    rows="3"
+                                                    value={damageData.reason}
+                                                    onChange={(e) => setDamageData({ ...damageData, reason: e.target.value })}
+                                                ></textarea>
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
-                                <div className="modal-footer" style={{ padding: '20px', display: 'flex', justifyContent: 'flex-end', gap: '10px', borderTop: '1px solid #eee' }}>
-                                    <button type="button" className="btn btn-secondary" onClick={() => setShowDamageModal(false)}>Cancel</button>
-                                    <button type="submit" className="btn btn-danger" style={{ backgroundColor: '#dc3545', color: 'white' }}>Submit Report</button>
-                                </div>
-                            </form>
+                                    <div className="modal-footer" style={{ padding: '20px', display: 'flex', justifyContent: 'flex-end', gap: '10px', borderTop: '1px solid #eee' }}>
+                                        <button type="button" className="btn btn-secondary" onClick={() => setShowDamageModal(false)}>Cancel</button>
+                                        <button type="submit" className="btn btn-danger" style={{ backgroundColor: '#dc3545', color: 'white' }}>Submit Report</button>
+                                    </div>
+                                </form>
+                            </div>
                         </div>
-                    </div>
-                )}
+                    )
+                }
             </div>
         </>
     );

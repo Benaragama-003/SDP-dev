@@ -1,21 +1,27 @@
 import React, { useState } from 'react';
 import Sidebar from '../components/Sidebar';
 import AdminSidebar from '../components/AdminSidebar';
-import { Save } from 'lucide-react';
+import { Save, Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { dealerApi } from '../services/api';
 import '../styles/Dealers.css';
 
 const DealerAdd = () => {
     const navigate = useNavigate();
     const { isAdmin } = useAuth();
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState(null);
     const [dealerData, setDealerData] = useState({
-        name: '',
-        contact: '',
+        dealer_name: '',
+        contact_number: '',
+        alternative_contact: '',
+        email: '',
         address: '',
         route: '',
-        creditLimit: '',
-        email: ''
+        credit_limit: '',
+        payment_terms_days: '30',
+        notes: ''
     });
 
     const handleChange = (e) => {
@@ -25,12 +31,35 @@ const DealerAdd = () => {
         });
     };
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
-        console.log('New Dealer:', dealerData);
-        // In a real app, this would be an API call
-        alert('Dealer Added Successfully! (Mock)');
-        navigate(isAdmin ? '/admin/dealers' : '/dealers');
+
+        try {
+            setLoading(true);
+            setError(null);
+
+            // Prepare data for backend
+            const dataToSubmit = {
+                dealer_name: dealerData.dealer_name,
+                contact_number: dealerData.contact_number,
+                address: dealerData.address,
+                route: dealerData.route, // Now required
+                alternative_contact: dealerData.alternative_contact || undefined,
+                email: dealerData.email || undefined,
+                credit_limit: dealerData.credit_limit ? Number(dealerData.credit_limit) : 0,
+                payment_terms_days: dealerData.payment_terms_days ? Number(dealerData.payment_terms_days) : 30,
+                notes: dealerData.notes || undefined
+            };
+
+            const response = await dealerApi.createDealer(dataToSubmit);
+            alert(`Dealer "${response.data.data.dealer_name}" created successfully!`);
+            navigate(isAdmin ? '/admin/dealers' : '/dealers');
+        } catch (err) {
+            console.error('Error creating dealer:', err);
+            setError(err.response?.data?.message || 'Failed to create dealer');
+        } finally {
+            setLoading(false);
+        }
     };
 
     const handleCancel = () => {
@@ -49,26 +78,49 @@ const DealerAdd = () => {
                         </div>
                     </div>
 
+                    {error && (
+                        <div style={{ padding: '15px', marginBottom: '20px', backgroundColor: '#f8d7da', color: '#721c24', borderRadius: '8px', border: '1px solid #f5c6cb' }}>
+                            {error}
+                        </div>
+                    )}
+
                     <form onSubmit={handleSubmit} className="dealer-form">
                         <div className="form-grid">
                             <div className="form-field">
                                 <label>Dealer Name*</label>
                                 <input
                                     type="text"
-                                    name="name"
-                                    value={dealerData.name}
+                                    name="dealer_name"
+                                    value={dealerData.dealer_name}
                                     onChange={handleChange}
                                     required
+                                    minLength={2}
+                                    maxLength={100}
                                 />
                             </div>
                             <div className="form-field">
                                 <label>Contact Number*</label>
                                 <input
                                     type="tel"
-                                    name="contact"
-                                    value={dealerData.contact}
+                                    name="contact_number"
+                                    value={dealerData.contact_number}
                                     onChange={handleChange}
                                     required
+                                    pattern="0[0-9]{9}"
+                                    placeholder="0771234567"
+                                    title="10 digits starting with 0"
+                                />
+                            </div>
+                            <div className="form-field">
+                                <label>Alternative Contact</label>
+                                <input
+                                    type="tel"
+                                    name="alternative_contact"
+                                    value={dealerData.alternative_contact}
+                                    onChange={handleChange}
+                                    pattern="0[0-9]{9}"
+                                    placeholder="0771234567"
+                                    title="10 digits starting with 0"
                                 />
                             </div>
                             <div className="form-field">
@@ -82,23 +134,27 @@ const DealerAdd = () => {
                             </div>
                             <div className="form-field">
                                 <label>Route*</label>
-                                <select name="route" value={dealerData.route} onChange={handleChange} required>
-                                    <option value="">Select Route</option>
-                                    <option value="Route A">Route A</option>
-                                    <option value="Route B">Route B</option>
-                                    <option value="Route C">Route C</option>
-                                </select>
-                            </div>
-                            <div className="form-field">
-                                <label>Credit Limit (Rs.)*</label>
                                 <input
-                                    type="number"
-                                    name="creditLimit"
-                                    value={dealerData.creditLimit}
+                                    type="text"
+                                    name="route"
+                                    value={dealerData.route}
                                     onChange={handleChange}
                                     required
+                                    placeholder="e.g., Ratnapura"
                                 />
                             </div>
+                            <div className="form-field">
+                                <label>Credit Limit (Rs.)</label>
+                                <input
+                                    type="number"
+                                    name="credit_limit"
+                                    value={dealerData.credit_limit}
+                                    onChange={handleChange}
+                                    min="0"
+                                    step="0.01"
+                                />
+                            </div>
+
                             <div className="form-field full-width">
                                 <label>Address*</label>
                                 <textarea
@@ -106,17 +162,46 @@ const DealerAdd = () => {
                                     value={dealerData.address}
                                     onChange={handleChange}
                                     required
+                                    rows={3}
+                                />
+                            </div>
+                            <div className="form-field full-width">
+                                <label>Notes</label>
+                                <textarea
+                                    name="notes"
+                                    value={dealerData.notes}
+                                    onChange={handleChange}
+                                    rows={3}
+                                    placeholder="Additional information about the dealer"
                                 />
                             </div>
                         </div>
 
                         <div className="form-actions">
-                            <button type="button" onClick={handleCancel} style={{ backgroundColor: '#dc3545', color: 'white', border: 'none', padding: '12px 30px', borderRadius: '10px', fontWeight: '600', cursor: 'pointer' }}>
+                            <button
+                                type="button"
+                                onClick={handleCancel}
+                                disabled={loading}
+                                style={{ backgroundColor: '#dc3545', color: 'white', border: 'none', padding: '12px 30px', borderRadius: '10px', fontWeight: '600', cursor: 'pointer' }}
+                            >
                                 Cancel
                             </button>
-                            <button type="submit" className="btn btn-primary">
-                                <Save size={20} />
-                                Save Dealer
+                            <button
+                                type="submit"
+                                className="btn btn-primary"
+                                disabled={loading}
+                            >
+                                {loading ? (
+                                    <>
+                                        <Loader2 size={20} className="spinner" style={{ animation: 'spin 1s linear infinite' }} />
+                                        Creating...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Save size={20} />
+                                        Save Dealer
+                                    </>
+                                )}
                             </button>
                         </div>
                     </form>

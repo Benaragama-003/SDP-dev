@@ -1,26 +1,59 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Sidebar from '../components/Sidebar';
-import { Search, Plus, Edit2, Trash2 } from 'lucide-react';
+import { Search, Plus, Edit2, Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { dealerApi } from '../services/api';
 import '../styles/Dealers.css';
 
 const Dealers = () => {
     const navigate = useNavigate();
     const [searchTerm, setSearchTerm] = useState('');
+    const [dealers, setDealers] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
 
-    // Mock dealers data
-    const dealers = [
-        { id: 'D001', name: 'ABC Stores', contact: '0771234567', route: 'Route A', creditLimit: 50000, status: 'active' },
-        { id: 'D002', name: 'XYZ Mart', contact: '0777654321', route: 'Route B', creditLimit: 75000, status: 'active' },
-        { id: 'D003', name: 'LMN Distributors', contact: '0769876543', route: 'Route A', creditLimit: 100000, status: 'active' },
-        { id: 'D004', name: 'PQR Suppliers', contact: '0775432167', route: 'Route C', creditLimit: 60000, status: 'inactive' },
-    ];
+    // Fetch dealers from backend
+    useEffect(() => {
+        fetchDealers();
+    }, []);
 
-    const filteredDealers = dealers.filter((dealer) =>
-        dealer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        dealer.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        dealer.route.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const fetchDealers = async () => {
+        try {
+            setLoading(true);
+            setError(null);
+            const response = await dealerApi.getAllDealers(searchTerm);
+            setDealers(response.data.data || []);
+        } catch (err) {
+            console.error('Error fetching dealers:', err);
+            setError(err.response?.data?.message || 'Failed to fetch dealers');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // Debounced search
+    useEffect(() => {
+        const delaySearch = setTimeout(() => {
+            if (searchTerm !== undefined) {
+                fetchDealers();
+            }
+        }, 500);
+
+        return () => clearTimeout(delaySearch);
+    }, [searchTerm]);
+
+    const getStatusBadgeClass = (status) => {
+        switch (status?.toUpperCase()) {
+            case 'ACTIVE':
+                return 'badge-success';
+            case 'INACTIVE':
+                return 'badge-danger';
+            case 'BLACKLISTED':
+                return 'badge-warning';
+            default:
+                return 'badge-secondary';
+        }
+    };
 
     return (
         <>
@@ -52,45 +85,65 @@ const Dealers = () => {
                                 />
                             </div>
                         </div>
-                        <table className="data-table">
-                            <thead>
-                                <tr>
-                                    <th>Dealer ID</th>
-                                    <th>Name</th>
-                                    <th>Contact</th>
-                                    <th>Route</th>
-                                    <th>Credit Limit</th>
-                                    <th>Status</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {filteredDealers.map((dealer) => (
-                                    <tr key={dealer.id}>
-                                        <td>{dealer.id}</td>
-                                        <td>{dealer.name}</td>
-                                        <td>{dealer.contact}</td>
-                                        <td>{dealer.route}</td>
-                                        <td>Rs. {dealer.creditLimit.toLocaleString()}</td>
-                                        <td>
-                                            <span className={`badge ${dealer.status === 'active' ? 'badge-success' : 'badge-danger'}`}>
-                                                {dealer.status.charAt(0).toUpperCase() + dealer.status.slice(1)}
-                                            </span>
-                                        </td>
-                                        <td>
-                                            <div className="table-actions-cell">
-                                                <button
-                                                    className="action-btn action-btn-edit"
-                                                    onClick={() => navigate(`/dealers/update/${dealer.id}`)}
-                                                >
-                                                    <Edit2 size={16} /> Edit
-                                                </button>
-                                            </div>
-                                        </td>
+
+                        {loading ? (
+                            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '40px' }}>
+                                <Loader2 size={40} className="spinner" style={{ animation: 'spin 1s linear infinite' }} />
+                            </div>
+                        ) : error ? (
+                            <div style={{ padding: '20px', textAlign: 'center', color: '#dc3545' }}>
+                                <p>Error: {error}</p>
+                                <button className="btn btn-primary" onClick={fetchDealers} style={{ marginTop: '10px' }}>
+                                    Retry
+                                </button>
+                            </div>
+                        ) : dealers.length === 0 ? (
+                            <div style={{ padding: '40px', textAlign: 'center', color: '#6c757d' }}>
+                                <p>No dealers found</p>
+                            </div>
+                        ) : (
+                            <table className="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Dealer ID</th>
+                                        <th>Name</th>
+                                        <th>Contact</th>
+                                        <th>Route</th>
+                                        <th>Credit Limit</th>
+                                        <th>Current Credit</th>
+                                        <th>Status</th>
+                                        <th>Actions</th>
                                     </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                                </thead>
+                                <tbody>
+                                    {dealers.map((dealer) => (
+                                        <tr key={dealer.dealer_id}>
+                                            <td>{dealer.dealer_id}</td>
+                                            <td>{dealer.dealer_name}</td>
+                                            <td>{dealer.contact_number}</td>
+                                            <td>{dealer.route || 'N/A'}</td>
+                                            <td>Rs. {Number(dealer.credit_limit || 0).toLocaleString()}</td>
+                                            <td>Rs. {Number(dealer.current_credit || 0).toLocaleString()}</td>
+                                            <td>
+                                                <span className={`badge ${getStatusBadgeClass(dealer.status)}`}>
+                                                    {dealer.status}
+                                                </span>
+                                            </td>
+                                            <td>
+                                                <div className="table-actions-cell">
+                                                    <button
+                                                        className="action-btn action-btn-edit"
+                                                        onClick={() => navigate(`/dealers/update/${dealer.dealer_id}`)}
+                                                    >
+                                                        <Edit2 size={16} /> Edit
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        )}
                     </div>
                 </main>
             </div>

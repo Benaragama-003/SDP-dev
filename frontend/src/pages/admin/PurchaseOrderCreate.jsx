@@ -50,15 +50,11 @@ const PurchaseOrderCreate = () => {
                             <h3 className="section-title">Order Details</h3>
                             <div className="form-grid">
                                 <div className="form-field">
-                                    <label>Supplier Name*</label>
-                                    <select required value={supplier} onChange={(e) => setSupplier(e.target.value)}>
-                                        <option value="">Select Supplier</option>
-                                        <option value="Laugfs Gas">Laugfs Gas</option>
-                                        <option value="Litro Gas">Litro Gas</option>
-                                    </select>
+                                    <label>Supplier</label>
+                                    <input type="text" value="Laugfs Gas" readOnly style={{ backgroundColor: '#f5f5f5' }} />
                                 </div>
                                 <div className="form-field">
-                                    <label>Expected Date</label>
+                                    <label>Expected Date*</label>
                                     <input type="date" required />
                                 </div>
                             </div>
@@ -76,9 +72,10 @@ const PurchaseOrderCreate = () => {
                                             required
                                         >
                                             <option value="">Select Weight</option>
-                                            <option value="5.0 kg">5.0 kg</option>
-                                            <option value="12.5 kg">12.5 kg</option>
-                                            <option value="37.5 kg">37.5 kg</option>
+                                            <option value="2kg">2kg</option>
+                                            <option value="5kg">5kg</option>
+                                            <option value="12.5kg">12.5kg</option>
+                                            <option value="37.5kg">37.5kg</option>
                                         </select>
                                     </div>
                                     <div className="form-field" style={{ flex: 1 }}>

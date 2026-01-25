@@ -12,10 +12,14 @@ export const useAuth = () => {
 };
 
 export const AuthProvider = ({ children }) => {
-    const [user, setUser] = useState(null);
+    // Synchronously initialize from localStorage to prevent flash of unauth
+    const [user, setUser] = useState(() => {
+        const storedUser = localStorage.getItem('dms_user');
+        return storedUser ? JSON.parse(storedUser) : null;
+    });
     const [loading, setLoading] = useState(true);
 
-    // Check for existing session on mount
+    // Verify session on mount
     useEffect(() => {
         const verifySession = async () => {
             const token = localStorage.getItem('dms_token');
@@ -23,7 +27,6 @@ export const AuthProvider = ({ children }) => {
 
             if (token && storedUser) {
                 try {
-                    // Optionally verify token with backend
                     const response = await api.get('/auth/profile');
                     const userData = response.data.data;
                     const userSession = {
@@ -34,9 +37,13 @@ export const AuthProvider = ({ children }) => {
                     localStorage.setItem('dms_user', JSON.stringify(userSession));
                 } catch (error) {
                     console.error('Session verification failed:', error);
-                    localStorage.removeItem('dms_token');
-                    localStorage.removeItem('dms_user');
-                    setUser(null);
+                    // Only clear if it's a definitive auth failure (401 or 403)
+                    // If it's a network error (no response), keep the local session
+                    if (error.response && (error.response.status === 401 || error.response.status === 403)) {
+                        localStorage.removeItem('dms_token');
+                        localStorage.removeItem('dms_user');
+                        setUser(null);
+                    }
                 }
             }
             setLoading(false);

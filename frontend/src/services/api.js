@@ -44,4 +44,25 @@ export const authApi = {
     updatePassword: (currentPassword, newPassword) => api.put('/auth/password', { currentPassword, newPassword }),
 };
 
+// Dealer API methods
+export const dealerApi = {
+    // Get all dealers with optional search parameter
+    getAllDealers: (search = '') => api.get(`/dealers${search ? `?search=${search}` : ''}`),
+
+    // Get dealer by ID
+    getDealerById: (id) => api.get(`/dealers/${id}`),
+
+    // Get dealer statistics (for dashboard)
+    getDealerStats: () => api.get('/dealers/stats'),
+
+    // Create new dealer
+    createDealer: (dealerData) => api.post('/dealers', dealerData),
+
+    // Update existing dealer
+    updateDealer: (id, dealerData) => api.put(`/dealers/${id}`, dealerData),
+
+    // Delete dealer (soft delete - sets status to INACTIVE)
+    deleteDealer: (id) => api.delete(`/dealers/${id}`),
+};
+
 export default api;

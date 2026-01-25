@@ -15,9 +15,9 @@ const SupervisorSales = () => {
             itemsCount: '45 cylinders',
             amount: 67500,
             items: [
-                { size: '5.0 kg', type: 'New', quantity: 20, price: 1500, amount: 30000 },
-                { size: '12.5 kg', type: 'Filled', quantity: 10, price: 3000, amount: 30000 },
-                { size: '5.0 kg', type: 'Filled', quantity: 5, price: 1500, amount: 7500 },
+                { size: '5kg', type: 'New', quantity: 20, price: 1500, amount: 30000 },
+                { size: '12.5kg', type: 'Filled', quantity: 10, price: 3000, amount: 30000 },
+                { size: '5kg', type: 'Filled', quantity: 5, price: 1500, amount: 7500 },
             ],
             details: { cash: 20000, cheque: 30000, credit: 17500 }
         }

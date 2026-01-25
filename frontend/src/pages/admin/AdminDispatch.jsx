@@ -7,6 +7,7 @@ import '../../styles/Dispatch.css';
 const AdminDispatch = () => {
     const navigate = useNavigate();
     const [selectedSupervisors, setSelectedSupervisors] = useState([]);
+    const [allocatedItems, setAllocatedItems] = useState([{ product_id: '', quantity: '' }]);
 
     // Mock supervisor data with locations
     const supervisors = [
@@ -86,7 +87,7 @@ const AdminDispatch = () => {
                                         <option value="">Choose a lorry</option>
                                         {lorries.filter(l => l.status === 'available').map(lorry => (
                                             <option key={lorry.id} value={lorry.id}>
-                                                {lorry.number} - {lorry.capacity}
+                                                {lorry.number}
                                             </option>
                                         ))}
                                     </select>
@@ -98,7 +99,7 @@ const AdminDispatch = () => {
                                         <option value="">Choose supervisor</option>
                                         {supervisors.filter(s => s.status === 'available').map(sup => (
                                             <option key={sup.id} value={sup.id}>
-                                                {sup.name} - {sup.route}
+                                                {sup.name}
                                             </option>
                                         ))}
                                     </select>
@@ -120,10 +121,70 @@ const AdminDispatch = () => {
                                 </div>
                             </div>
 
-                            <div className="form-actions">
-                                <button type="submit" className="btn btn-primary">
+                            <div className="allocation-section" style={{ marginTop: '30px', padding: '25px', backgroundColor: '#fdfdfd', borderRadius: '20px', border: '1px solid #eee' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+                                    <h3 className="section-title" style={{ fontSize: '18px', margin: 0 }}>Product Allocation</h3>
+                                    <button
+                                        type="button"
+                                        onClick={() => setAllocatedItems([...allocatedItems, { product_id: '', quantity: '' }])}
+                                        style={{ backgroundColor: '#101540', color: 'white', border: 'none', padding: '8px 15px', borderRadius: '8px', fontSize: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}
+                                    >
+                                        <Plus size={14} /> Add Product
+                                    </button>
+                                </div>
+
+                                <div className="allocation-list">
+                                    {allocatedItems.length === 0 && (
+                                        <p style={{ textAlign: 'center', color: '#999', padding: '20px', fontSize: '14px', border: '1px dashed #ddd', borderRadius: '10px' }}>No products allocated yet. Click "Add Product" to start.</p>
+                                    )}
+                                    {allocatedItems.map((item, index) => (
+                                        <div key={index} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 40px', gap: '15px', marginBottom: '12px', alignItems: 'center' }}>
+                                            <select
+                                                style={{ padding: '10px', borderRadius: '8px', border: '1px solid #ddd' }}
+                                                value={item.product_id}
+                                                onChange={(e) => {
+                                                    const newItems = [...allocatedItems];
+                                                    newItems[index].product_id = e.target.value;
+                                                    setAllocatedItems(newItems);
+                                                }}
+                                                required
+                                            >
+                                                <option value="">Select Product</option>
+                                                <option value="2kg">2kg Cylinder</option>
+                                                <option value="5kg">5kg Cylinder</option>
+                                                <option value="12.5kg">12.5kg Cylinder</option>
+                                                <option value="37.5kg">37.5kg Cylinder</option>
+                                                <option value="20kg">20kg Cylinder</option>
+                                            </select>
+                                            <input
+                                                type="number"
+                                                placeholder="Qty"
+                                                min="1"
+                                                style={{ padding: '10px', borderRadius: '8px', border: '1px solid #ddd' }}
+                                                value={item.quantity}
+                                                onChange={(e) => {
+                                                    const newItems = [...allocatedItems];
+                                                    newItems[index].quantity = e.target.value;
+                                                    setAllocatedItems(newItems);
+                                                }}
+                                                required
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={() => setAllocatedItems(allocatedItems.filter((_, i) => i !== index))}
+                                                style={{ backgroundColor: '#dc3545', color: 'white', border: 'none', padding: '8px', borderRadius: '8px', cursor: 'pointer' }}
+                                            >
+                                                ×
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <div className="form-actions" style={{ marginTop: '30px' }}>
+                                <button type="submit" className="btn btn-primary" style={{ width: '100%' }}>
                                     <Truck size={20} />
-                                    Create Dispatch
+                                    Confirm Dispatch & Allocation
                                 </button>
                             </div>
                         </form>

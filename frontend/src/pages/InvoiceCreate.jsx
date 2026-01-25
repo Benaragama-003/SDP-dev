@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import Sidebar from '../components/Sidebar';
-import { Save } from 'lucide-react';
+import { Save, Plus } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import '../styles/Invoice.css';
 
@@ -25,6 +25,16 @@ const InvoiceCreate = () => {
         route: 'Route A'
     };
 
+    const [allocatedItems, setAllocatedItems] = useState([]);
+    // mock data for prices
+    const productPrices = {
+        '2kg': { filled: 800, new: 1800 },
+        '5kg': { filled: 1500, new: 3500 },
+        '12.5kg': { filled: 3000, new: 7500 },
+        '37.5kg': { filled: 8500, new: 18500 },
+        '20kg': { filled: 4500, new: 9500 }
+    };
+
     const [invoiceData, setInvoiceData] = useState({
         dealer: '',
         route: '',
@@ -32,15 +42,10 @@ const InvoiceCreate = () => {
         supervisor: '',
         lorryNo: '',
         date: new Date().toISOString().split('T')[0],
-        items: {
-            '5kg': { filled: 0, new: 0, amount: 0 },
-            '12.5kg': { filled: 0, new: 0, amount: 0 },
-            '37.5kg': { filled: 0, new: 0, amount: 0 }
-        },
-        paymentType: 'cash',
-        chequeNo: '',
-        chequeDate: '',
-        chequeAmount: ''
+        chequeAmount: '',
+        bankName: '',
+        branchName: '',
+        paidAmount: ''
     });
 
     // Auto-populate supervisor and lorry from active dispatch
@@ -75,29 +80,18 @@ const InvoiceCreate = () => {
         d.id.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
-    const handleItemChange = (size, field, value) => {
-        const newItems = { ...invoiceData.items };
-        newItems[size][field] = parseInt(value) || 0;
-
-        // Auto-calculate amount if filled or new changed
-        if (field === 'filled' || field === 'new') {
-            const pricePerItem = size === '5kg' ? 1500 : size === '12.5kg' ? 3000 : 8500;
-            newItems[size].amount = (newItems[size].filled + newItems[size].new) * pricePerItem;
-        }
-
-        setInvoiceData({
-            ...invoiceData,
-            items: newItems
-        });
-    };
-
     const getTotalAmount = () => {
-        return Object.values(invoiceData.items).reduce((sum, item) => sum + item.amount, 0);
+        return allocatedItems.reduce((sum, item) => {
+            const pricing = productPrices[item.product_id] || { filled: 0, new: 0 };
+            const price = item.type === 'new' ? pricing.new : pricing.filled;
+            return sum + (price * (parseInt(item.quantity) || 0));
+        }, 0);
     };
 
     const handleSubmit = (e) => {
         e.preventDefault();
-        console.log('Invoice Created:', invoiceData);
+        const fullInvoiceData = { ...invoiceData, items: allocatedItems, total: getTotalAmount() };
+        console.log('Invoice Created:', fullInvoiceData);
         alert('Invoice issued successfully!');
     };
 
@@ -208,54 +202,77 @@ const InvoiceCreate = () => {
                         </div>
 
                         {/* Items Grid */}
-                        <div className="form-section">
-                            <h3 className="section-title">Products</h3>
-                            <div className="items-table">
-                                <table>
-                                    <thead>
-                                        <tr>
-                                            <th>Cylinder Size</th>
-                                            <th>Filled</th>
-                                            <th>New</th>
-                                            <th>Amount (Rs.)</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {Object.entries(invoiceData.items).map(([size, values]) => (
-                                            <tr key={size}>
-                                                <td className="size-cell">{size}</td>
-                                                <td>
-                                                    <input
-                                                        type="number"
-                                                        min="0"
-                                                        value={values.filled}
-                                                        onChange={(e) => handleItemChange(size, 'filled', e.target.value)}
-                                                        className="table-input"
-                                                    />
-                                                </td>
-                                                <td>
-                                                    <input
-                                                        type="number"
-                                                        min="0"
-                                                        value={values.new}
-                                                        onChange={(e) => handleItemChange(size, 'new', e.target.value)}
-                                                        className="table-input"
-                                                    />
-                                                </td>
-                                                <td className="amount-cell">Rs. {values.amount.toLocaleString()}</td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                    <tfoot>
-                                        <tr>
-                                            <td colSpan="3" className="total-label">Total Amount</td>
-                                            <td className="total-amount">Rs. {getTotalAmount().toLocaleString()}</td>
-                                        </tr>
-                                    </tfoot>
-                                </table>
+                        <div className="allocation-section" style={{ marginTop: '30px', padding: '25px', backgroundColor: '#fdfdfd', borderRadius: '20px', border: '1px solid #eee' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+                                <h3 className="section-title" style={{ fontSize: '18px', margin: 0 }}>Product Allocation</h3>
+                                <button
+                                    type="button"
+                                    onClick={() => setAllocatedItems([...allocatedItems, { product_id: '', type: 'filled', quantity: '' }])}
+                                    style={{ backgroundColor: '#101540', color: 'white', border: 'none', padding: '8px 15px', borderRadius: '8px', fontSize: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}
+                                >
+                                    <Plus size={14} /> Add Product
+                                </button>
+                            </div>
+
+                            <div className="allocation-list">
+                                {allocatedItems.length === 0 && (
+                                    <p style={{ textAlign: 'center', color: '#999', padding: '20px', fontSize: '14px', border: '1px dashed #ddd', borderRadius: '10px' }}>No products allocated yet. Click "Add Product" to start.</p>
+                                )}
+                                {allocatedItems.map((item, index) => (
+                                    <div key={index} style={{ display: 'grid', gridTemplateColumns: '2fr 1.5fr 1fr 40px', gap: '15px', marginBottom: '12px', alignItems: 'center' }}>
+                                        <select
+                                            style={{ padding: '10px', borderRadius: '8px', border: '1px solid #ddd' }}
+                                            value={item.product_id}
+                                            onChange={(e) => {
+                                                const newItems = [...allocatedItems];
+                                                newItems[index].product_id = e.target.value;
+                                                setAllocatedItems(newItems);
+                                            }}
+                                            required
+                                        >
+                                            <option value="">Select Size</option>
+                                            <option value="2kg">2kg </option>
+                                            <option value="5kg">5kg </option>
+                                            <option value="12.5kg">12.5kg </option>
+                                            <option value="37.5kg">37.5kg </option>
+                                        </select>
+                                        <select
+                                            style={{ padding: '10px', borderRadius: '8px', border: '1px solid #ddd' }}
+                                            value={item.type}
+                                            onChange={(e) => {
+                                                const newItems = [...allocatedItems];
+                                                newItems[index].type = e.target.value;
+                                                setAllocatedItems(newItems);
+                                            }}
+                                            required
+                                        >
+                                            <option value="filled">Filled </option>
+                                            <option value="new">New </option>
+                                        </select>
+                                        <input
+                                            type="number"
+                                            placeholder="Qty"
+                                            min="1"
+                                            style={{ padding: '10px', borderRadius: '8px', border: '1px solid #ddd' }}
+                                            value={item.quantity}
+                                            onChange={(e) => {
+                                                const newItems = [...allocatedItems];
+                                                newItems[index].quantity = e.target.value;
+                                                setAllocatedItems(newItems);
+                                            }}
+                                            required
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => setAllocatedItems(allocatedItems.filter((_, i) => i !== index))}
+                                            style={{ backgroundColor: '#dc3545', color: 'white', border: 'none', padding: '8px', borderRadius: '8px', cursor: 'pointer' }}
+                                        >
+                                            ×
+                                        </button>
+                                    </div>
+                                ))}
                             </div>
                         </div>
-
                         {/* Payment Section */}
                         <div className="form-section">
                             <h3 className="section-title">Payment Details</h3>
@@ -292,6 +309,29 @@ const InvoiceCreate = () => {
                                 </label>
                             </div>
 
+                            {invoiceData.paymentType === 'cash' && (
+                                <div className="cash-details" style={{ marginTop: '20px', padding: '15px', backgroundColor: '#f9f9f9', borderRadius: '10px', border: '1px solid #eee' }}>
+                                    <div className="form-field" style={{ maxWidth: '300px' }}>
+                                        <label>Paid Amount (Rs.)*</label>
+                                        <input
+                                            type="number"
+                                            name="paidAmount"
+                                            value={invoiceData.paidAmount}
+                                            onChange={handleInputChange}
+                                            required
+                                            placeholder="Enter amount paid"
+                                            style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #ddd' }}
+                                        />
+                                    </div>
+                                    <div style={{ marginTop: '10px', display: 'flex', justifyContent: 'space-between', fontSize: '14px' }}>
+                                        <span style={{ color: '#666' }}>Balance to return:</span>
+                                        <span style={{ fontWeight: 'bold', color: (parseFloat(invoiceData.paidAmount) || 0) - getTotalAmount() >= 0 ? '#2e7d32' : '#dc3545' }}>
+                                            Rs. {Math.max(0, (parseFloat(invoiceData.paidAmount) || 0) - getTotalAmount()).toLocaleString()}
+                                        </span>
+                                    </div>
+                                </div>
+                            )}
+
                             {invoiceData.paymentType === 'cheque' && (
                                 <div className="cheque-details">
                                     <div className="form-grid">
@@ -325,13 +365,38 @@ const InvoiceCreate = () => {
                                                 required
                                             />
                                         </div>
+                                        <div className="form-field">
+                                            <label>Bank Name*</label>
+                                            <input
+                                                type="text"
+                                                name="bankName"
+                                                value={invoiceData.bankName}
+                                                onChange={handleInputChange}
+                                                required
+                                            />
+                                        </div>
+                                        <div className="form-field">
+                                            <label>Branch Name*</label>
+                                            <input
+                                                type="text"
+                                                name="branchName"
+                                                value={invoiceData.branchName}
+                                                onChange={handleInputChange}
+                                                required
+                                            />
+                                        </div>
                                     </div>
                                 </div>
                             )}
                         </div>
 
-                        <div className="form-actions">
-                            <button type="submit" className="btn btn-secondary">
+                        <div style={{ marginTop: '20px', padding: '15px', backgroundColor: '#f0f2f5', borderRadius: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span style={{ fontWeight: '600', color: '#666' }}>Total Invoice Amount:</span>
+                            <span style={{ fontSize: '20px', fontWeight: 'bold', color: '#101540' }}>Rs. {getTotalAmount().toLocaleString()}</span>
+                        </div>
+
+                        <div className="form-actions" style={{ marginTop: '30px' }}>
+                            <button type="submit" className="btn btn-primary" style={{ width: '100%', padding: '15px', borderRadius: '12px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '10px' }}>
                                 <Save size={20} />
                                 Issue Invoice
                             </button>

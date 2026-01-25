@@ -1,4 +1,4 @@
-// src/server.js
+
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -11,6 +11,11 @@ const errorHandler = require('./middleware/errorHandler');
 
 // Import routes
 const authRoutes = require('./routes/authRoutes');
+const dealerRoutes = require('./routes/dealerRoutes');
+const productRoutes = require('./routes/productRoutes');
+const invoiceRoutes = require('./routes/invoiceRoutes');
+const poRoutes = require('./routes/purchaseOrderRoutes');
+const dispatchRoutes = require('./routes/dispatchRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -26,8 +31,8 @@ app.use(morgan('dev'));
 
 // Health check
 app.get('/health', (req, res) => {
-  res.json({ 
-    status: 'OK', 
+  res.json({
+    status: 'OK',
     message: 'GDMS API is running',
     timestamp: new Date().toISOString()
   });
@@ -35,7 +40,11 @@ app.get('/health', (req, res) => {
 
 // API Routes
 app.use(`${API_PREFIX}/auth`, authRoutes);
-
+app.use(`${API_PREFIX}/dealers`, dealerRoutes);
+app.use(`${API_PREFIX}/products`, productRoutes);
+app.use(`${API_PREFIX}/invoices`, invoiceRoutes);
+app.use(`${API_PREFIX}/purchase-orders`, poRoutes);
+app.use(`${API_PREFIX}/dispatches`, dispatchRoutes);
 // 404 handler
 app.use((req, res) => {
   res.status(404).json({

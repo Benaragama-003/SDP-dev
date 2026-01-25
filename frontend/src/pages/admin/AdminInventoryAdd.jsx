@@ -7,11 +7,14 @@ import '../../styles/Inventory.css';
 const AdminInventoryAdd = () => {
     const navigate = useNavigate();
 
-    const [productType, setProductType] = useState('Cylinder');
-    const [filledPrice, setFilledPrice] = useState('');
-    const [newPrice, setNewPrice] = useState('');
-
-    const emptyPrice = (newPrice && filledPrice) ? (Number(newPrice) - Number(filledPrice)) : 0;
+    const [formData, setFormData] = useState({
+        size: '',
+        supplier_filled: '',
+        supplier_new: '',
+        dealer_filled: '',
+        dealer_new: '',
+        reorder_level: '100'
+    });
 
     const handleSubmit = (e) => {
         e.preventDefault();
@@ -35,74 +38,74 @@ const AdminInventoryAdd = () => {
                         <div className="form-section">
                             <div className="form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '20px' }}>
                                 <div className="form-field">
-                                    <label>Product Type*</label>
-                                    <select
+                                    <label>Product Type</label>
+                                    <input type="text" value="Gas Cylinder" readOnly style={{ backgroundColor: '#f5f5f5' }} />
+                                </div>
+                                <div className="form-field">
+                                    <label>Size (e.g. 12.5kg)*</label>
+                                    <input
+                                        type="text"
                                         required
-                                        value={productType}
-                                        onChange={(e) => setProductType(e.target.value)}
-                                    >
-                                        <option value="Cylinder">Gas Cylinder (General)</option>
-                                        <option value="Cylinder Filled">Gas Cylinder (Filled)</option>
-                                        <option value="Cylinder New">Gas Cylinder (New)</option>
-                                        <option value="Accessory">Accessory</option>
-                                        <option value="Regulator">Regulator</option>
-                                    </select>
+                                        placeholder="Enter size"
+                                        value={formData.size}
+                                        onChange={(e) => setFormData({ ...formData, size: e.target.value })}
+                                    />
                                 </div>
-                                <div className="form-field">
-                                    <label>Size / Weight*</label>
-                                    <input type="text" required placeholder="e.g. 12.5 kg" />
-                                </div>
-                                <div className="form-field">
-                                    <label>Initial Stock Quantity*</label>
-                                    <input type="number" required placeholder="0" />
-                                </div>
-                                {productType.includes('Cylinder') && (
-                                    <>
-                                        <div className="form-field">
-                                            <label>Filled Price (Rs)*</label>
-                                            <input
-                                                type="number"
-                                                required
-                                                placeholder="0.00"
-                                                value={filledPrice}
-                                                onChange={(e) => setFilledPrice(e.target.value)}
-                                            />
-                                        </div>
-                                        <div className="form-field">
-                                            <label>New Price (Cylinder + Gas) (Rs)*</label>
-                                            <input
-                                                type="number"
-                                                required
-                                                placeholder="0.00"
-                                                value={newPrice}
-                                                onChange={(e) => setNewPrice(e.target.value)}
-                                            />
-                                        </div>
-                                        <div className="form-field">
-                                            <label>Empty Price (Calculated)</label>
-                                            <input
-                                                type="number"
-                                                readOnly
-                                                value={emptyPrice}
-                                                style={{ backgroundColor: '#f0f0f0' }}
-                                            />
-                                            <small style={{ color: '#666' }}>Empty = New - Filled</small>
-                                        </div>
-                                    </>
-                                )}
-                                {!productType.includes('Cylinder') && (
+
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
                                     <div className="form-field">
-                                        <label>Unit Price (Rs)*</label>
-                                        <input type="number" required placeholder="0.00" />
+                                        <label>Filled Price (Supplier) (Rs)*</label>
+                                        <input
+                                            type="number"
+                                            required
+                                            placeholder="0.00"
+                                            value={formData.supplier_filled}
+                                            onChange={(e) => setFormData({ ...formData, supplier_filled: e.target.value })}
+                                        />
                                     </div>
-                                )}
-                                <div className="form-field">
-                                    <label>Dealer Price (Rs)*</label>
-                                    <input type="number" required placeholder="0.00" title="Price sold to dealers" />
+                                    <div className="form-field">
+                                        <label>New Price (Supplier) (Rs)*</label>
+                                        <input
+                                            type="number"
+                                            required
+                                            placeholder="0.00"
+                                            value={formData.supplier_new}
+                                            onChange={(e) => setFormData({ ...formData, supplier_new: e.target.value })}
+                                        />
+                                    </div>
                                 </div>
+
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                                    <div className="form-field">
+                                        <label>Filled Price (Dealer) (Rs)*</label>
+                                        <input
+                                            type="number"
+                                            required
+                                            placeholder="0.00"
+                                            value={formData.dealer_filled}
+                                            onChange={(e) => setFormData({ ...formData, dealer_filled: e.target.value })}
+                                        />
+                                    </div>
+                                    <div className="form-field">
+                                        <label>New Price (Dealer) (Rs)*</label>
+                                        <input
+                                            type="number"
+                                            required
+                                            placeholder="0.00"
+                                            value={formData.dealer_new}
+                                            onChange={(e) => setFormData({ ...formData, dealer_new: e.target.value })}
+                                        />
+                                    </div>
+                                </div>
+
                                 <div className="form-field">
                                     <label>Reorder Level</label>
-                                    <input type="number" placeholder="Minimum stock alert level" />
+                                    <input
+                                        type="number"
+                                        placeholder="100"
+                                        value={formData.reorder_level}
+                                        onChange={(e) => setFormData({ ...formData, reorder_level: e.target.value })}
+                                    />
                                 </div>
                             </div>
                         </div>

@@ -24,7 +24,7 @@ const PurchaseOrders = () => {
         {
             id: 'PO-002',
             date: '2026-01-12',
-            supplier: 'Litro Gas',
+            supplier: 'Laugfs Gas',
             items: '200 x 37.5kg Cylinders',
             total: 1700000,
             status: 'approved',

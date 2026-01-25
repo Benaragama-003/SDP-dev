@@ -117,29 +117,45 @@ const AdminCheques = () => {
 
                 {showUpdateModal && selectedCheque && (
                     <div className="modal-overlay" onClick={() => setShowUpdateModal(false)}>
-                        <div className="modal-content" onClick={e => e.stopPropagation()}>
-                            <div className="modal-header">
-                                <h2 className="modal-title">Update Cheque Status</h2>
+                        <div className="modal-content" style={{ borderRadius: '20px', maxWidth: '500px' }} onClick={e => e.stopPropagation()}>
+                            <div className="modal-header" style={{ padding: '20px 25px', borderBottom: '1px solid #eee' }}>
+                                <h2 className="modal-title">Check Details</h2>
                                 <button className="modal-close" onClick={() => setShowUpdateModal(false)}>×</button>
                             </div>
-                            <form onSubmit={handleUpdateStatus}>
-                                <div className="modal-body">
-                                    <p><strong>Cheque No:</strong> {selectedCheque.chequeNo}</p>
-                                    <p><strong>Dealer:</strong> {selectedCheque.dealer}</p>
-                                    <div className="form-field" style={{ marginTop: '15px' }}>
-                                        <label>New Status</label>
-                                        <select name="status" defaultValue={selectedCheque.status} required>
-                                            <option value="pending">Pending</option>
-                                            <option value="cleared">Cleared</option>
-                                            <option value="bounced">Bounced</option>
-                                        </select>
+                            <div className="modal-body" style={{ padding: '25px' }}>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                                    <div>
+                                        <p style={{ fontSize: '12px', color: '#666', margin: '0 0 5px 0' }}>Cheque No</p>
+                                        <p style={{ fontWeight: '600', margin: 0 }}>{selectedCheque.chequeNo}</p>
+                                    </div>
+                                    <div>
+                                        <p style={{ fontSize: '12px', color: '#666', margin: '0 0 5px 0' }}>Dealer</p>
+                                        <p style={{ fontWeight: '600', margin: 0 }}>{selectedCheque.dealer}</p>
+                                    </div>
+                                    <div>
+                                        <p style={{ fontSize: '12px', color: '#666', margin: '0 0 5px 0' }}>Bank</p>
+                                        <p style={{ fontWeight: '600', margin: 0 }}>{selectedCheque.bankName || 'BOC'}</p>
+                                    </div>
+                                    <div>
+                                        <p style={{ fontSize: '12px', color: '#666', margin: '0 0 5px 0' }}>Branch</p>
+                                        <p style={{ fontWeight: '600', margin: 0 }}>{selectedCheque.branchName || 'Colombo'}</p>
+                                    </div>
+                                    <div style={{ gridColumn: '1 / -1' }}>
+                                        <form onSubmit={handleUpdateStatus}>
+                                            <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', marginBottom: '8px' }}>Update Status</label>
+                                            <select name="status" defaultValue={selectedCheque.status} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #ddd' }} required>
+                                                <option value="pending">Pending</option>
+                                                <option value="cleared">Cleared</option>
+                                                <option value="bounced">Bounced</option>
+                                            </select>
+                                            <div style={{ marginTop: '20px', display: 'flex', gap: '10px' }}>
+                                                <button type="button" className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setShowUpdateModal(false)}>Cancel</button>
+                                                <button type="submit" className="btn btn-primary" style={{ flex: 1.5 }}>Update Status</button>
+                                            </div>
+                                        </form>
                                     </div>
                                 </div>
-                                <div className="modal-footer" style={{ padding: '20px', display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
-                                    <button type="button" className="btn btn-secondary" onClick={() => setShowUpdateModal(false)}>Cancel</button>
-                                    <button type="submit" className="btn btn-primary">Update</button>
-                                </div>
-                            </form>
+                            </div>
                         </div>
                     </div>
                 )}

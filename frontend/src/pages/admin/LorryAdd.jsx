@@ -35,15 +35,6 @@ const LorryAdd = () => {
                                     <input type="text" placeholder="e.g. Isuzu Elf" />
                                 </div>
                                 <div className="form-field">
-                                    <label>Load Capacity*</label>
-                                    <select required>
-                                        <option value="">Select Capacity</option>
-                                        <option value="5 tons">5 Tons</option>
-                                        <option value="10 tons">10 Tons</option>
-                                        <option value="15 tons">15 Tons</option>
-                                    </select>
-                                </div>
-                                <div className="form-field">
                                     <label>Initial Mileage (km)</label>
                                     <input type="number" placeholder="0" />
                                 </div>

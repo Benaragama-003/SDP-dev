@@ -14,17 +14,17 @@ const AdminInventory = () => {
 
     // Mock grouped inventory data
     const inventoryGrouped = [
-        { size: '2.3 kg', filled: 50, empty: 30, damaged: 5, newCount: 20 },
-        { size: '5.0 kg', filled: 150, empty: 80, damaged: 12, newCount: 45 },
-        { size: '12.5 kg', filled: 200, empty: 120, damaged: 8, newCount: 60 },
-        { size: '37.5 kg', filled: 100, empty: 60, damaged: 4, newCount: 25 },
+        { size: '2kg', filled: 50, empty: 30, damaged: 5, newCount: 20 },
+        { size: '5kg', filled: 150, empty: 80, damaged: 12, newCount: 45 },
+        { size: '12.5kg', filled: 200, empty: 120, damaged: 8, newCount: 60 },
+        { size: '37.5kg', filled: 100, empty: 60, damaged: 4, newCount: 25 },
     ];
 
+    // Mock dealers data for the damage report modal
     const [dealers] = useState([
-        { id: 'D001', name: 'ABC Stores' },
-        { id: 'D002', name: 'XYZ Mart' },
-        { id: 'D003', name: 'LMN Distributors' },
-        { id: 'D004', name: 'PQR Suppliers' },
+        { id: 'D001', name: 'A.N.G. Enterprises (Pvt) Ltd' },
+        { id: 'D002', name: 'Ratnapura Gas Center' },
+        { id: 'D003', name: 'Sabaragamuwa Dealers' },
     ]);
 
     const filteredData = inventoryGrouped.filter((item) =>
@@ -128,9 +128,10 @@ const AdminInventory = () => {
                                                 <label>Select Cylinder Size</label>
                                                 <select required>
                                                     <option value="all">All Sizes</option>
-                                                    <option value="5.0 kg">5.0 kg</option>
-                                                    <option value="12.5 kg">12.5 kg</option>
-                                                    <option value="37.5 kg">37.5 kg</option>
+                                                    <option value="2kg">2kg</option>
+                                                    <option value="5kg">5kg</option>
+                                                    <option value="12.5kg">12.5kg</option>
+                                                    <option value="37.5kg">37.5kg</option>
                                                 </select>
                                             </div>
                                             <div className="form-field">
@@ -141,13 +142,21 @@ const AdminInventory = () => {
                                                 <label>Update New Price (Rs)</label>
                                                 <input type="number" placeholder="New price or leave empty" />
                                             </div>
+                                            <div className="form-field">
+                                                <label>Update Supplier Filled Price (Rs)</label>
+                                                <input type="number" placeholder="New price or leave empty" />
+                                            </div>
+                                            <div className="form-field">
+                                                <label>Update Supplier New Price (Rs)</label>
+                                                <input type="number" placeholder="New price or leave empty" />
+                                            </div>
                                         </div>
                                         <p style={{ fontSize: '13px', color: '#666', marginTop: '10px' }}>
                                             Note: Entering a value will override the current price for all selected sizes.
                                         </p>
                                     </div>
                                     <div className="modal-footer" style={{ padding: '20px', display: 'flex', justifyContent: 'flex-end', gap: '10px', borderTop: '1px solid #eee' }}>
-                                        <button type="button" className="btn btn-secondary" onClick={() => setShowPriceUpdate(false)}>Cancel</button>
+                                        <button type="button" className="btn btn-danger" onClick={() => setShowPriceUpdate(false)}>Cancel</button>
                                         <button type="submit" className="btn btn-primary">Update Prices</button>
                                     </div>
                                 </form>

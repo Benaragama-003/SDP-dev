@@ -73,8 +73,6 @@ const LorryManagement = () => {
                                 <tr>
                                     <th>Lorry ID</th>
                                     <th>License Number</th>
-                                    <th>Capacity</th>
-                                    <th>Last Service</th>
                                     <th>Status</th>
                                     <th>Actions</th>
                                 </tr>
@@ -84,8 +82,6 @@ const LorryManagement = () => {
                                     <tr key={lorry.id}>
                                         <td>{lorry.id}</td>
                                         <td>{lorry.number}</td>
-                                        <td>{lorry.capacity}</td>
-                                        <td>{lorry.lastService}</td>
                                         <td>
                                             <span className={`badge ${lorry.status === 'available' ? 'badge-success' :
                                                 lorry.status === 'in-service' ? 'badge-warning' : 'badge-danger'

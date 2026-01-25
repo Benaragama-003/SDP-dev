@@ -1,4 +1,8 @@
 .login-page {
+    background-image: url('../assets/images/Login.jpg');
+    background-size: cover;
+    background-position: center;
+    background-attachment: fixed;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -13,6 +17,7 @@
 }
 
 .login-card {
+    
     background-color: #d9d9d9;
     border-radius: 50px;
     box-shadow: 0px 4px 4px 0px rgba(0, 0, 0, 0.25);
@@ -24,16 +29,9 @@
     flex-direction: row;
     overflow: hidden;
     position: relative;
+    
 }
 
-/* Left side (Image/Branding) - assuming the design has a split or centered layout based on the code analysis */
-/* From the Figma code: It seems to be a single large card with absolute positioning in the original, but for responsive web we should use Flexbox/Grid. 
-   The design snippet shows:
-   - "Hidellana Distributors" text
-   - "Login to DMS System" text
-   - Inputs for Email, Password
-   - Login Button
-*/
 
 .login-content {
     display: flex;
@@ -130,7 +128,7 @@
     background-color: #a6a624;
 }
 
-/* Responsive Adjustments */
+
 @media (max-width: 768px) {
     .login-card {
         border-radius: 20px;
@@ -171,8 +169,29 @@
     border-left: 4px solid #c62828;
 }
 
-.register-link {
+.login-links-container {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    width: 100%;
+    max-width: 410px;
     margin-top: 20px;
+}
+   
+
+.forgot-password-link a {
+     font-family: 'Poppins', sans-serif;
+    font-size: 14px;
+     color: #f90303;
+    text-decoration: none;
+    font-weight: 500;
+}
+
+.forgot-password-link a:hover {
+    text-decoration: underline;
+}
+
+.register-link {
     font-family: 'Poppins', sans-serif;
     font-size: 14px;
     color: #333;
