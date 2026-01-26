@@ -6,7 +6,7 @@ const { checkRole } = require('../middleware/roleCheck');
 const router = express.Router();
 
 router.use(authenticateToken);
-
+router.get('/inventory', productController.getInventorySummary);
 router.get('/', getAllProducts);
 router.post('/', checkRole('ADMIN'), createProduct);
 

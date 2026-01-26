@@ -69,9 +69,8 @@ const AdminDispatch = () => {
                             </h3>
                             <div className="location-map-mock">
                                 <p style={{ textAlign: 'center', color: '#666', padding: '40px' }}>
-                                    📍 Map View - Shows real-time supervisor locations
-                                    <br />
-                                    <small>(Integration with Google Maps API required)</small>
+                                    📍 Map View
+                                    <small></small>
                                 </p>
                             </div>
                         </div>
@@ -188,6 +187,72 @@ const AdminDispatch = () => {
                                 </button>
                             </div>
                         </form>
+
+                        {/* Recent Dispatches Section */}
+                        <div className="dispatch-section" style={{ marginTop: '40px' }}>
+                            <h3 className="section-title">Recent Dispatches</h3>
+                            <div className="table-container" style={{ padding: '0', border: 'none', boxShadow: 'none' }}>
+                                <table className="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Dispatch ID</th>
+                                            <th>Date</th>
+                                            <th>Lorry</th>
+                                            <th>Supervisor</th>
+                                            <th>Status</th>
+                                            <th style={{ textAlign: 'center' }}>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {/* Mocking mixed state dispatches */}
+                                        {[
+                                            { id: 'DSP-001', date: '2026-01-27', lorry: 'CAA-1234', supervisor: 'John Supervisor', status: 'scheduled' },
+                                            { id: 'DSP-002', date: '2026-01-26', lorry: 'CAB-5678', supervisor: 'Jane Smith', status: 'awaiting-unload' },
+                                            { id: 'DSP-003', date: '2026-01-26', lorry: 'CAC-9012', supervisor: 'Mike Johnson', status: 'in-progress' }
+                                        ].map((dispatch) => (
+                                            <tr key={dispatch.id}>
+                                                <td style={{ fontWeight: '600' }}>{dispatch.id}</td>
+                                                <td>{dispatch.date}</td>
+                                                <td>{dispatch.lorry}</td>
+                                                <td>{dispatch.supervisor}</td>
+                                                <td>
+                                                    <span className={`badge badge-${dispatch.status === 'scheduled' ? 'secondary' :
+                                                        dispatch.status === 'awaiting-unload' ? 'warning' : 'primary'
+                                                        }`}>
+                                                        {dispatch.status.replace('-', ' ')}
+                                                    </span>
+                                                </td>
+                                                <td>
+                                                    <div style={{ display: 'flex', justifyContent: 'center', gap: '8px' }}>
+                                                        {dispatch.status === 'scheduled' && (
+                                                            <button
+                                                                className="btn btn-sm btn-danger"
+                                                                style={{ fontSize: '12px', padding: '5px 10px' }}
+                                                                onClick={() => alert(`Cancelling ${dispatch.id}`)}
+                                                            >
+                                                                Cancel
+                                                            </button>
+                                                        )}
+                                                        {dispatch.status === 'awaiting-unload' && (
+                                                            <button
+                                                                className="btn btn-sm btn-success"
+                                                                style={{ fontSize: '12px', padding: '5px 10px', backgroundColor: '#101540', color: 'white', border: 'none' }}
+                                                                onClick={() => alert(`Accepting Unload for ${dispatch.id}`)}
+                                                            >
+                                                                Accept Unload
+                                                            </button>
+                                                        )}
+                                                        {(dispatch.status === 'in-progress') && (
+                                                            <span style={{ fontSize: '12px', color: '#666' }}>No actions available</span>
+                                                        )}
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
                     </div>
                 </main>
             </div>

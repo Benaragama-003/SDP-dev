@@ -15,7 +15,8 @@ const generateToken = (user) => {
       userId: user.user_id,      // User's unique ID
       username: user.username,   // Username
       role: user.role,           // ADMIN or SUPERVISOR
-      email: user.email          // Email address
+      email: user.email,         // Email address
+      accessLevel: user.access_level || null // Level 1 (Full) or Level 2 (Restricted)
     },
     process.env.JWT_SECRET,      // Secret key to sign token
     { expiresIn: process.env.JWT_EXPIRE || '7d' }  // Token expires in 7 days
@@ -56,13 +57,25 @@ const register = async (req, res, next) => {
 
     const password_hash = await hashPassword(password);
 
-    // Generate unique user ID
-    const user_id = generateId('USR');
+    const [lastUser] = await pool.execute(
+      "SELECT user_id FROM users WHERE user_id LIKE 'S%' ORDER BY user_id DESC LIMIT 1"
+    );
+    let user_id;
+    if (lastUser.length > 0) {
+      // 2. Extract the number (e.g., 'S005' -> 5) and increment it
+      const lastNum = parseInt(lastUser[0].user_id.substring(1));
+      const nextNum = lastNum + 1;
+      // 3. Format back to S006 (padded with zeros)
+      user_id = `S${nextNum.toString().padStart(3, '0')}`;
+    } else {
+      // Starting fresh if no S-prefixed IDs exist
+      user_id = 'S001';
+    }
 
     // Insert into users table
     await pool.execute(
       `INSERT INTO users (user_id, username, full_name, password_hash, email, phone_number, role, status)
-       VALUES (?, ?, ?, ?, ?, ?, 'SUPERVISOR', 'ACTIVE')`,
+       VALUES (?, ?, ?, ?, ?, ?, 'SUPERVISOR', 'INACTIVE')`,
       [user_id, username, name, password_hash, email, phone_number]
     );
 
@@ -162,7 +175,7 @@ const login = async (req, res, next) => {
     } else if (user.role === 'SUPERVISOR') {
       // Get supervisor-specific data
       const [supervisors] = await pool.execute(
-        'SELECT daily_target, achieved_sales, status as supervisor_status FROM supervisors WHERE supervisor_id = ?',
+        'SELECT monthly_target, achieved_sales, status as supervisor_status FROM supervisors WHERE supervisor_id = ?',
         [user.user_id]
       );
       if (supervisors.length > 0) {
@@ -171,7 +184,10 @@ const login = async (req, res, next) => {
     }
 
     // Generate JWT token
-    const token = generateToken(user);
+    const token = generateToken({
+      ...user,
+      access_level: roleData.access_level
+    });
 
     // Remove sensitive data
     delete user.password_hash;
@@ -225,7 +241,7 @@ const getProfile = async (req, res, next) => {
       }
     } else if (user.role === 'SUPERVISOR') {
       const [supervisors] = await pool.execute(
-        'SELECT daily_target, achieved_sales, status as supervisor_status FROM supervisors WHERE supervisor_id = ?',
+        'SELECT monthly_target, achieved_sales, status as supervisor_status FROM supervisors WHERE supervisor_id = ?',
         [userId]
       );
       if (supervisors.length > 0) {
@@ -412,20 +428,98 @@ const updateProfile = async (req, res, next) => {
   }
 };
 
-// ============================================
-// LOGOUT (Optional - for future)
-// ============================================
-// Purpose: Invalidate token (Note: JWT tokens can't be truly invalidated without a blacklist)
-// This is a placeholder for future token blacklist implementation
 const logout = async (req, res, next) => {
   try {
-    // In a real implementation, you would:
-    // 1. Add token to blacklist in database/Redis
-    // 2. Check blacklist in authenticateToken middleware
-
-    // For now, just return success
-    // UI should remove token from storage
     return successResponse(res, 200, 'Logout successful');
+  } catch (error) {
+    next(error);
+  }
+};
+// Get all supervisors (Admin only)
+const getAllSupervisors = async (req, res, next) => {
+  try {
+    const pool = await getConnection();
+    const [supervisors] = await pool.execute(`
+  SELECT u.user_id, u.username, u.full_name, u.email, u.phone_number, u.role, u.status, 
+         s.monthly_target, s.achieved_sales
+  FROM users u
+  LEFT JOIN supervisors s ON u.user_id = s.supervisor_id
+  WHERE u.role = 'SUPERVISOR'
+  ORDER BY u.created_date DESC
+`);
+    return successResponse(res, 200, 'Supervisors retrieved successfully', supervisors);
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Update supervisor status/activation (Admin only)
+const updateSupervisorStatus = async (req, res, next) => {
+  const { id } = req.params;
+  const { status } = req.body;
+
+  try {
+    const pool = await getConnection();
+
+    // Update the status in the users table
+    const [result] = await pool.execute(
+      'UPDATE users SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ? AND role = "SUPERVISOR"',
+      [status, id]
+    );
+
+    if (result.affectedRows === 0) {
+      return errorResponse(res, 404, 'Supervisor not found');
+    }
+
+    return successResponse(res, 200, `Supervisor status updated to ${status}`);
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Promote a supervisor to Admin Level 2 (Restricted)
+const promoteToAdmin = async (req, res, next) => {
+  const { id } = req.params; // Supervisor's ID
+
+  try {
+    const pool = await getConnection();
+    const connection = await pool.getConnection();
+    await connection.beginTransaction();
+
+    try {
+      // 1. Check if user is currently a supervisor
+      const [user] = await connection.execute(
+        'SELECT user_id, role FROM users WHERE user_id = ? AND role = "SUPERVISOR"',
+        [id]
+      );
+
+      if (user.length === 0) {
+        throw new Error('User not found or is already an admin');
+      }
+
+      // 2. Update Role to ADMIN in users table
+      await connection.execute(
+        'UPDATE users SET role = "ADMIN", updated_at = CURRENT_TIMESTAMP WHERE user_id = ?',
+        [id]
+      );
+
+      // 3. Insert into admins table with Level 2 (Restricted)
+      await connection.execute(
+        'INSERT INTO admins (admin_id, access_level) VALUES (?, 2) ON DUPLICATE KEY UPDATE access_level = 2',
+        [id]
+      );
+
+      // 4. (Optional) We keep the supervisor record for history or remove it?
+      // For now, let's keep it but mark them as an Admin in the main table.
+
+      await connection.commit();
+      return successResponse(res, 200, 'Supervisor promoted to Restricted Admin (Level 2) successfully');
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
   } catch (error) {
     next(error);
   }
@@ -440,5 +534,8 @@ module.exports = {
   logout,
   requestPasswordReset,
   resetPassword,
-  updateProfile
+  updateProfile,
+  getAllSupervisors,
+  updateSupervisorStatus,
+  promoteToAdmin
 };

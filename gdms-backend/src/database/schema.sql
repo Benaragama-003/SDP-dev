@@ -40,11 +40,9 @@ CREATE TABLE supervisors (
     supervisor_id VARCHAR(20) PRIMARY KEY,
     achieved_sales DECIMAL(10,2) DEFAULT 0,
     monthly_target DECIMAL(12,2) DEFAULT 0,
-    assigned_lorry_id VARCHAR(20),
     status ENUM('AVAILABLE', 'ON_DUTY', 'OFF_DUTY') DEFAULT 'AVAILABLE',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (supervisor_id) REFERENCES users(user_id) ON DELETE CASCADE,
-    FOREIGN KEY (assigned_lorry_id) REFERENCES lorries(lorry_id) ON DELETE SET NULL,
     INDEX idx_supervisor_status (status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -75,6 +73,7 @@ CREATE TABLE products (
     product_id VARCHAR(20) PRIMARY KEY,
     product_code VARCHAR(10) UNIQUE NOT NULL,
     cylinder_size VARCHAR(20) NOT NULL,
+    product_type ENUM('FILLED', 'EMPTY', 'DAMAGED') NOT NULL,
     supplier_filled_price DECIMAL(10,2) NOT NULL DEFAULT 0,
     supplier_new_price DECIMAL(10,2) NOT NULL DEFAULT 0,
     dealer_filled_price DECIMAL(10,2) NOT NULL DEFAULT 0,
@@ -145,7 +144,6 @@ CREATE TABLE purchase_orders (
     supplier VARCHAR(100) DEFAULT 'Laugfs Gas',
     supplier_contact VARCHAR(15),
     subtotal DECIMAL(10,2) NOT NULL,
-    tax_amount DECIMAL(10,2) DEFAULT 0,
     total_amount DECIMAL(10,2) NOT NULL,
     status ENUM('DRAFT', 'PENDING', 'APPROVED', 'RECEIVED', 'CANCELLED', 'PARTIAL') NOT NULL DEFAULT 'PENDING',
     invoice_number VARCHAR(50),
@@ -186,7 +184,7 @@ CREATE TABLE dispatches (
     lorry_id VARCHAR(20) NOT NULL,
     supervisor_id VARCHAR(20) NOT NULL,
     dispatch_route VARCHAR(50),
-    status ENUM('SCHEDULED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED') DEFAULT 'SCHEDULED',
+    status ENUM('SCHEDULED', 'IN_PROGRESS', 'COMPLETED', 'AWAITING_UNLOAD', 'UNLOADED', 'CANCELLED') DEFAULT 'SCHEDULED',
     notes TEXT,
     created_by VARCHAR(20) NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -224,8 +222,6 @@ CREATE TABLE invoices (
     dispatch_id VARCHAR(20),
     subtotal DECIMAL(10,2) NOT NULL,
     total_amount DECIMAL(10,2) NOT NULL,
-    payment_method ENUM('CASH', 'CHEQUE', 'CREDIT', 'BANK_TRANSFER') NOT NULL,
-    payment_status ENUM('PAID', 'PENDING', 'PARTIAL', 'OVERDUE') DEFAULT 'PENDING',
     due_date DATE,
     notes TEXT,
     sms_sent BOOLEAN DEFAULT FALSE,
@@ -238,8 +234,7 @@ CREATE TABLE invoices (
     FOREIGN KEY (dispatch_id) REFERENCES dispatches(dispatch_id) ON DELETE SET NULL,
     INDEX idx_invoice_number (invoice_number),
     INDEX idx_dealer (dealer_id),
-    INDEX idx_date (invoice_date),
-    INDEX idx_payment_status (payment_status)
+    INDEX idx_date (invoice_date)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE invoice_items (
@@ -260,8 +255,8 @@ CREATE TABLE payments (
     invoice_id VARCHAR(20) NOT NULL,
     payment_date DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     amount DECIMAL(10,2) NOT NULL,
-    payment_method ENUM('CASH', 'CHEQUE', 'CREDIT', 'BANK_TRANSFER') NOT NULL,
-    status ENUM('COMPLETED', 'PENDING', 'FAILED', 'CANCELLED') DEFAULT 'COMPLETED',
+    payment_method ENUM('CASH', 'CHEQUE') NOT NULL,
+    status ENUM('COMPLETED', 'PENDING', 'CANCELLED') DEFAULT 'COMPLETED',
     collected_by VARCHAR(20) NOT NULL,
     reference_number VARCHAR(50),
     bank_name VARCHAR(100),

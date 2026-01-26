@@ -4,6 +4,7 @@ const express = require('express');
 const { body } = require('express-validator');
 const { validate } = require('../middleware/validator');
 const { authenticateToken } = require('../middleware/auth');
+const { checkRole } = require('../middleware/roleCheck');
 const {
   register,
   login,
@@ -12,7 +13,10 @@ const {
   logout,
   requestPasswordReset,
   resetPassword,
-  updateProfile
+  updateProfile,
+  getAllSupervisors,
+  updateSupervisorStatus,
+  promoteToAdmin
 } = require('../controllers/authController');
 
 const router = express.Router();
@@ -106,5 +110,14 @@ router.put('/profile', authenticateToken, [
   body('email').optional().isEmail().withMessage('Please provide a valid email address').normalizeEmail(),
   body('username').optional().isLength({ min: 3 }).withMessage('Username must be at least 3 characters long')
 ], validate, updateProfile);
+
+// Admin only: Get all supervisors
+router.get('/supervisors', authenticateToken, checkRole(['ADMIN']), getAllSupervisors);
+
+// Super Admin (Level 1) only: Update supervisor status (activation)
+router.patch('/supervisors/:id/status', authenticateToken, checkRole(['ADMIN'], 1), updateSupervisorStatus);
+
+// Super Admin (Level 1) only: Promote to Admin
+router.post('/supervisors/:id/promote', authenticateToken, checkRole(['ADMIN'], 1), promoteToAdmin);
 
 module.exports = router;

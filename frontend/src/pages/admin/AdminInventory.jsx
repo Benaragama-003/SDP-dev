@@ -1,45 +1,49 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import AdminSidebar from '../../components/AdminSidebar';
-import { Search, Plus, DollarSign, Edit2 } from 'lucide-react';
+import { Search, Plus, DollarSign, Edit2, Loader2, AlertTriangle } from 'lucide-react';
+import api from '../../services/api';
 import '../../styles/Inventory.css';
 
 const AdminInventory = () => {
     const [searchTerm, setSearchTerm] = useState('');
+    const [inventoryData, setInventoryData] = useState([]);
+    const [loading, setLoading] = useState(true);
     const [showPriceUpdate, setShowPriceUpdate] = useState(false);
-
     const [showDamageModal, setShowDamageModal] = useState(false);
+    const [dealers] = useState([]); // Could be fetched from API later
 
     const navigate = useNavigate();
 
-    // Mock grouped inventory data
-    const inventoryGrouped = [
-        { size: '2kg', filled: 50, empty: 30, damaged: 5, newCount: 20 },
-        { size: '5kg', filled: 150, empty: 80, damaged: 12, newCount: 45 },
-        { size: '12.5kg', filled: 200, empty: 120, damaged: 8, newCount: 60 },
-        { size: '37.5kg', filled: 100, empty: 60, damaged: 4, newCount: 25 },
-    ];
+    const fetchInventory = async () => {
+        try {
+            setLoading(true);
+            const response = await api.get('/products/inventory');
+            setInventoryData(response.data.data);
+        } catch (err) {
+            console.error("Failed to fetch inventory", err);
+        } finally {
+            setLoading(false);
+        }
+    };
 
-    // Mock dealers data for the damage report modal
-    const [dealers] = useState([
-        { id: 'D001', name: 'A.N.G. Enterprises (Pvt) Ltd' },
-        { id: 'D002', name: 'Ratnapura Gas Center' },
-        { id: 'D003', name: 'Sabaragamuwa Dealers' },
-    ]);
+    useEffect(() => {
+        fetchInventory();
+    }, []);
 
-    const filteredData = inventoryGrouped.filter((item) =>
-        item.size.toLowerCase().includes(searchTerm.toLowerCase())
+    const filteredData = (inventoryData || []).filter((item) =>
+        item.cylinder_size.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
     const handlePriceUpdate = (e) => {
         e.preventDefault();
-        alert('Prices Updated Successfully! (Mock)');
+        alert('Price updates will be implemented soon!');
         setShowPriceUpdate(false);
     };
 
     const handleDamageReport = (e) => {
         e.preventDefault();
-        alert('Damage Report Submitted Successfully!');
+        alert('Damage reporting will be implemented soon!');
         setShowDamageModal(false);
     };
 
@@ -63,7 +67,7 @@ const AdminInventory = () => {
                                 Update Prices
                             </button>
                             <button className="btn btn-danger" style={{ backgroundColor: '#dc3545', color: 'white' }} onClick={() => setShowDamageModal(true)}>
-                                <Edit2 size={20} />
+                                <AlertTriangle size={20} />
                                 Report Damage
                             </button>
                         </div>
@@ -95,130 +99,120 @@ const AdminInventory = () => {
                                 </tr>
                             </thead>
                             <tbody>
-                                {filteredData.map((item, index) => (
-                                    <tr key={index}>
-                                        <td style={{ fontWeight: '600' }}>{item.size}</td>
-                                        <td>{item.filled}</td>
-                                        <td>{item.empty}</td>
-                                        <td style={{ color: '#dc3545' }}>{item.damaged}</td>
-                                        <td>{item.newCount}</td>
-                                        <td style={{ fontWeight: 'bold' }}>
-                                            {item.filled + item.empty + item.damaged + item.newCount}
+                                {loading ? (
+                                    <tr>
+                                        <td colSpan="6" style={{ textAlign: 'center', padding: '40px' }}>
+                                            <Loader2 className="spinner" size={30} style={{ margin: '0 auto' }} />
+                                            <p style={{ marginTop: '10px' }}>Loading inventory...</p>
                                         </td>
                                     </tr>
-                                ))}
+                                ) : filteredData.length === 0 ? (
+                                    <tr>
+                                        <td colSpan="6" style={{ textAlign: 'center', padding: '40px' }}>
+                                            No products found in inventory.
+                                        </td>
+                                    </tr>
+                                ) : (
+                                    filteredData.map((item, index) => (
+                                        <tr key={index}>
+                                            <td style={{ fontWeight: '600' }}>{item.cylinder_size}</td>
+                                            <td>{item.filled}</td>
+                                            <td>{item.empty}</td>
+                                            <td style={{ color: '#dc3545' }}>{item.damaged}</td>
+                                            <td>{item.new_stock}</td>
+                                            <td style={{ fontWeight: 'bold' }}>
+                                                {item.filled + item.empty + item.damaged + item.new_stock}
+                                            </td>
+                                        </tr>
+                                    ))
+                                )}
                             </tbody>
                         </table>
                     </div>
                 </main>
 
                 {/* Price Update Modal */}
-                {
-                    showPriceUpdate && (
-                        <div className="modal-overlay" onClick={() => setShowPriceUpdate(false)}>
-                            <div className="modal-content" onClick={e => e.stopPropagation()}>
-                                <div className="modal-header">
-                                    <h2 className="modal-title">Bulk Price Update</h2>
-                                    <button className="modal-close" onClick={() => setShowPriceUpdate(false)}>×</button>
-                                </div>
-                                <form onSubmit={handlePriceUpdate}>
-                                    <div className="modal-body">
-                                        <div className="form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
-                                            <div className="form-field" style={{ gridColumn: '1 / -1' }}>
-                                                <label>Select Cylinder Size</label>
-                                                <select required>
-                                                    <option value="all">All Sizes</option>
-                                                    <option value="2kg">2kg</option>
-                                                    <option value="5kg">5kg</option>
-                                                    <option value="12.5kg">12.5kg</option>
-                                                    <option value="37.5kg">37.5kg</option>
-                                                </select>
-                                            </div>
-                                            <div className="form-field">
-                                                <label>Update Filled Price (Rs)</label>
-                                                <input type="number" placeholder="New price or leave empty" />
-                                            </div>
-                                            <div className="form-field">
-                                                <label>Update New Price (Rs)</label>
-                                                <input type="number" placeholder="New price or leave empty" />
-                                            </div>
-                                            <div className="form-field">
-                                                <label>Update Supplier Filled Price (Rs)</label>
-                                                <input type="number" placeholder="New price or leave empty" />
-                                            </div>
-                                            <div className="form-field">
-                                                <label>Update Supplier New Price (Rs)</label>
-                                                <input type="number" placeholder="New price or leave empty" />
-                                            </div>
-                                        </div>
-                                        <p style={{ fontSize: '13px', color: '#666', marginTop: '10px' }}>
-                                            Note: Entering a value will override the current price for all selected sizes.
-                                        </p>
-                                    </div>
-                                    <div className="modal-footer" style={{ padding: '20px', display: 'flex', justifyContent: 'flex-end', gap: '10px', borderTop: '1px solid #eee' }}>
-                                        <button type="button" className="btn btn-danger" onClick={() => setShowPriceUpdate(false)}>Cancel</button>
-                                        <button type="submit" className="btn btn-primary">Update Prices</button>
-                                    </div>
-                                </form>
+                {showPriceUpdate && (
+                    <div className="modal-overlay" onClick={() => setShowPriceUpdate(false)}>
+                        <div className="modal-content" onClick={e => e.stopPropagation()}>
+                            <div className="modal-header">
+                                <h2 className="modal-title">Bulk Price Update</h2>
+                                <button className="modal-close" onClick={() => setShowPriceUpdate(false)}>×</button>
                             </div>
+                            <form onSubmit={handlePriceUpdate}>
+                                <div className="modal-body">
+                                    <div className="form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
+                                        <div className="form-field" style={{ gridColumn: '1 / -1' }}>
+                                            <label>Select Cylinder Size</label>
+                                            <select required>
+                                                <option value="">Select size...</option>
+                                                {inventoryData.map((item, idx) => (
+                                                    <option key={idx} value={item.cylinder_size}>
+                                                        {item.cylinder_size}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                        <div className="form-field">
+                                            <label>Update Filled Price (Rs)</label>
+                                            <input type="number" placeholder="New price" />
+                                        </div>
+                                        <div className="form-field">
+                                            <label>Update New Price (Rs)</label>
+                                            <input type="number" placeholder="New price" />
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="modal-footer" style={{ padding: '20px', display: 'flex', justifyContent: 'flex-end', gap: '10px', borderTop: '1px solid #eee' }}>
+                                    <button type="button" className="btn btn-danger" onClick={() => setShowPriceUpdate(false)}>Cancel</button>
+                                    <button type="submit" className="btn btn-primary">Update Prices</button>
+                                </div>
+                            </form>
                         </div>
-                    )
-                }
+                    </div>
+                )}
 
                 {/* Damage Report Modal */}
-                {
-                    showDamageModal && (
-                        <div className="modal-overlay" onClick={() => setShowDamageModal(false)}>
-                            <div className="modal-content" onClick={e => e.stopPropagation()}>
-                                <div className="modal-header">
-                                    <h2 className="modal-title">Report Damage Inventory</h2>
-                                    <button className="modal-close" onClick={() => setShowDamageModal(false)}>×</button>
-                                </div>
-                                <form onSubmit={handleDamageReport}>
-                                    <div className="modal-body">
-                                        <div className="form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '15px' }}>
-                                            <div className="form-field">
-                                                <label>Product (Cylinder Size)</label>
-                                                <select required>
-                                                    <option value="">Select Size...</option>
-                                                    {inventoryGrouped.map((item, idx) => (
-                                                        <option key={idx} value={item.size}>
-                                                            {item.size}
-                                                        </option>
-                                                    ))}
-                                                </select>
-                                            </div>
-                                            <div className="form-field">
-                                                <label>Dealer Who Reported (Optional)</label>
-                                                <select>
-                                                    <option value="">Internal / No Dealer</option>
-                                                    {dealers.map(dealer => (
-                                                        <option key={dealer.id} value={dealer.id}>
-                                                            {dealer.name}
-                                                        </option>
-                                                    ))}
-                                                </select>
-                                            </div>
-                                            <div className="form-field">
-                                                <label>Quantity Damaged</label>
-                                                <input type="number" required placeholder="0" min="1" />
-                                            </div>
-                                            <div className="form-field">
-                                                <label>Reason / Notes</label>
-                                                <textarea required placeholder="Describe the damage..." rows="3"></textarea>
-                                            </div>
+                {showDamageModal && (
+                    <div className="modal-overlay" onClick={() => setShowDamageModal(false)}>
+                        <div className="modal-content" onClick={e => e.stopPropagation()}>
+                            <div className="modal-header">
+                                <h2 className="modal-title">Report Damage Inventory</h2>
+                                <button className="modal-close" onClick={() => setShowDamageModal(false)}>×</button>
+                            </div>
+                            <form onSubmit={handleDamageReport}>
+                                <div className="modal-body">
+                                    <div className="form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '15px' }}>
+                                        <div className="form-field">
+                                            <label>Product (Cylinder Size)</label>
+                                            <select required>
+                                                <option value="">Select Size...</option>
+                                                {inventoryData.map((item, idx) => (
+                                                    <option key={idx} value={item.cylinder_size}>
+                                                        {item.cylinder_size}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                        <div className="form-field">
+                                            <label>Quantity Damaged</label>
+                                            <input type="number" required placeholder="0" min="1" />
+                                        </div>
+                                        <div className="form-field">
+                                            <label>Reason / Notes</label>
+                                            <textarea required placeholder="Describe the damage..." rows="3"></textarea>
                                         </div>
                                     </div>
-                                    <div className="modal-footer" style={{ padding: '20px', display: 'flex', justifyContent: 'flex-end', gap: '10px', borderTop: '1px solid #eee' }}>
-                                        <button type="button" className="btn btn-secondary" onClick={() => setShowDamageModal(false)}>Cancel</button>
-                                        <button type="submit" className="btn btn-danger" style={{ backgroundColor: '#dc3545', color: 'white' }}>Submit Report</button>
-                                    </div>
-                                </form>
-                            </div>
+                                </div>
+                                <div className="modal-footer" style={{ padding: '20px', display: 'flex', justifyContent: 'flex-end', gap: '10px', borderTop: '1px solid #eee' }}>
+                                    <button type="button" className="btn btn-secondary" onClick={() => setShowDamageModal(false)}>Cancel</button>
+                                    <button type="submit" className="btn btn-danger" style={{ backgroundColor: '#dc3545', color: 'white' }}>Submit Report</button>
+                                </div>
+                            </form>
                         </div>
-                    )
-                }
-            </div >
+                    </div>
+                )}
+            </div>
         </>
     );
 };

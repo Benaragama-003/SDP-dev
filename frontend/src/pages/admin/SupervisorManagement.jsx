@@ -1,17 +1,32 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import AdminSidebar from '../../components/AdminSidebar';
-import { Search, Plus, UserCheck, UserX } from 'lucide-react';
+import { Search, Plus, UserCheck, UserX, ShieldAlert } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
 import '../../styles/Dealers.css';
+import api from '../../services/api';
 
 const SupervisorManagement = () => {
+    const { user: currentAdmin } = useAuth();
     const [searchTerm, setSearchTerm] = useState('');
+    const [supervisors, setSupervisors] = useState([]);
+    const [loading, setLoading] = useState(true);
 
-    const [supervisors, setSupervisors] = useState([
-        { id: 'S001', name: 'John Supervisor', email: 'john@hidellana.lk', contact: '0771234567', route: 'Route A', status: 'active', target: 2500000 },
-        { id: 'S002', name: 'Jane Smith', email: 'jane@hidellana.lk', contact: '0777654321', route: 'Route B', status: 'active', target: 2000000 },
-        { id: 'S003', name: 'Mike Johnson', email: 'mike@hidellana.lk', contact: '0769876543', route: 'Route C', status: 'active', target: 1800000 },
-        { id: 'S004', name: 'Sarah Williams', email: 'sarah@hidellana.lk', contact: '0775432167', route: 'Route A', status: 'inactive', target: 1500000 },
-    ]);
+    const isFullAdmin = currentAdmin?.access_level === 1;
+
+    const fetchSupervisors = async () => {
+        try {
+            const response = await api.get('/auth/supervisors');
+            setSupervisors(response.data.data);
+        } catch (error) {
+            console.error('Failed to fetch supervisors:', error);
+            alert('Could not load supervisors');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => { fetchSupervisors(); }, []);
+
     const [showEditModal, setShowEditModal] = useState(false);
     const [selectedSup, setSelectedSup] = useState(null);
     const [editData, setEditData] = useState({
@@ -22,30 +37,51 @@ const SupervisorManagement = () => {
         status: ''
     });
 
-    const filtered = supervisors.filter((sup) =>
-        sup.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        sup.email.toLowerCase().includes(searchTerm.toLowerCase())
+    const filtered = (supervisors || []).filter((sup) =>
+        (sup.full_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (sup.email || '').toLowerCase().includes(searchTerm.toLowerCase())
     );
 
     const handleEditClick = (sup) => {
         setSelectedSup(sup);
         setEditData({
-            name: sup.name,
-            email: sup.email,
-            contact: sup.contact,
-            target: sup.target,
-            status: sup.status
+            name: sup.full_name || '',
+            email: sup.email || '',
+            contact: sup.phone_number || '',
+            target: sup.monthly_target || 0,
+            status: (sup.status || 'INACTIVE').toLowerCase()
         });
         setShowEditModal(true);
     };
 
-    const handleEditSubmit = (e) => {
+    const handleEditSubmit = async (e) => {
         e.preventDefault();
-        setSupervisors(supervisors.map(s =>
-            s.id === selectedSup.id ? { ...s, ...editData, target: Number(editData.target) } : s
-        ));
-        setShowEditModal(false);
-        alert('Supervisor updated successfully!');
+        try {
+            await api.patch(`/auth/supervisors/${selectedSup.user_id}/status`, {
+                status: editData.status.toUpperCase()
+            });
+            fetchSupervisors();
+            setShowEditModal(false);
+            alert('Supervisor status updated successfully!');
+        } catch (error) {
+            console.error('Failed to update supervisor:', error);
+            alert(error.response?.data?.message || 'Update failed');
+        }
+    };
+
+    const handlePromote = async (sup) => {
+        if (!window.confirm(`Are you sure you want to promote ${sup.full_name} to Admin (Level 2)?\nThis action will grant them administrative access.`)) {
+            return;
+        }
+
+        try {
+            await api.post(`/auth/supervisors/${sup.user_id}/promote`);
+            alert('Supervisor promoted to Admin Level 2 successfully!');
+            fetchSupervisors(); // Refresh list
+        } catch (error) {
+            console.error('Promotion failed:', error);
+            alert(error.response?.data?.message || 'Promotion failed');
+        }
     };
 
     return (
@@ -59,6 +95,13 @@ const SupervisorManagement = () => {
                             <p className="page-subtitle">Manage supervisor accounts and permissions</p>
                         </div>
                     </div>
+
+                    {!isFullAdmin && (
+                        <div style={{ backgroundColor: '#fff4e5', color: '#663c00', padding: '12px 20px', borderRadius: '10px', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '10px', fontSize: '14px', border: '1px solid #ffe2b7' }}>
+                            <ShieldAlert size={20} />
+                            <span><strong>Restricted Access:</strong> You do not have permission to active accounts or promote supervisors.</span>
+                        </div>
+                    )}
 
                     <div className="table-container">
                         <div className="table-header">
@@ -88,25 +131,56 @@ const SupervisorManagement = () => {
                             </thead>
                             <tbody>
                                 {filtered.map((sup) => (
-                                    <tr key={sup.id}>
-                                        <td>{sup.id}</td>
-                                        <td>{sup.name}</td>
-                                        <td>{sup.email}</td>
-                                        <td>{sup.contact}</td>
-                                        <td style={{ fontWeight: '600', color: '#101540' }}>Rs. {(sup.target || 1500000).toLocaleString()}</td>
+                                    <tr key={sup.user_id}>
+                                        <td>{sup.user_id}</td>
+                                        <td>{sup.full_name}</td>
+                                        <td title={sup.email}>
+                                            <div className="email-cell">{sup.email}</div>
+                                        </td>
+                                        <td>{sup.phone_number}</td>
+                                        <td style={{ fontWeight: '500', color: '#101540' }}>
+                                            Rs. {(sup.monthly_target || 0).toLocaleString()}
+                                        </td>
                                         <td>
-                                            <span className={`badge ${sup.status === 'active' ? 'badge-success' : 'badge-danger'}`}>
-                                                {sup.status.charAt(0).toUpperCase() + sup.status.slice(1)}
+                                            <span className={`badge ${sup.status.toLowerCase() === 'active' ? 'badge-success' : 'badge-danger'}`}>
+                                                {sup.status}
                                             </span>
                                         </td>
                                         <td>
-                                            <div className="table-actions-cell">
+                                            <div className="table-actions-cell" style={{ display: 'flex', gap: '8px', minWidth: 'max-content', width: '100%' }}>
                                                 <button
-                                                    className="action-btn action-btn-edit"
+                                                    className="action-btn"
+                                                    disabled={!isFullAdmin}
                                                     onClick={() => handleEditClick(sup)}
-                                                    style={{ padding: '8px 16px', fontSize: '12px', backgroundColor: '#bfbf2a', color: 'white' }}
+                                                    style={{
+                                                        padding: '8px 16px',
+                                                        fontSize: '11px',
+                                                        flex: 'none',
+                                                        width: 'auto',
+                                                        backgroundColor: isFullAdmin ? '#bfbf2a' : '#ccc',
+                                                        color: 'white',
+                                                        opacity: isFullAdmin ? 1 : 0.6,
+                                                        cursor: isFullAdmin ? 'pointer' : 'not-allowed'
+                                                    }}
                                                 >
-                                                    Edit
+                                                    Edit / Activate
+                                                </button>
+                                                <button
+                                                    className="action-btn"
+                                                    disabled={!isFullAdmin}
+                                                    onClick={() => handlePromote(sup)}
+                                                    style={{
+                                                        padding: '8px 16px',
+                                                        fontSize: '11px',
+                                                        flex: 'none',
+                                                        width: 'auto',
+                                                        backgroundColor: isFullAdmin ? '#101540' : '#ccc',
+                                                        color: 'white',
+                                                        opacity: isFullAdmin ? 1 : 0.6,
+                                                        cursor: isFullAdmin ? 'pointer' : 'not-allowed'
+                                                    }}
+                                                >
+                                                    Promote
                                                 </button>
                                             </div>
                                         </td>
@@ -161,7 +235,7 @@ const SupervisorManagement = () => {
                                     </div>
                                 </div>
                                 <div style={{ display: 'flex', gap: '10px', marginTop: '30px' }}>
-                                    <button type="button" className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setShowEditModal(false)}>Cancel</button>
+                                    <button type="button" className="btn btn-danger" style={{ flex: 1 }} onClick={() => setShowEditModal(false)}>Cancel</button>
                                     <button type="submit" className="btn btn-primary" style={{ flex: 1.5 }}>Save Changes</button>
                                 </div>
                             </form>

@@ -55,7 +55,7 @@ const Register = () => {
                 formData.password,
                 formData.phone_number
             );
-            navigate('/login', { state: { message: 'Registration successful! Please login.' } });
+            navigate('/login', { state: { message: 'Registration successful! Your account is pending admin activation. Please wait before logging in.' } });
         } catch (err) {
             setError(err.message);
         } finally {

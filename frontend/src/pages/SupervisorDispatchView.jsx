@@ -22,8 +22,29 @@ const SupervisorDispatchView = () => {
                 '12.5kg': { loaded: 140, sold: 100, damage: 0, balance: 40 },
                 '37.5kg': { loaded: 0, sold: 0, damage: 0, balance: 0 }
             }
+        },
+        {
+            id: 'D002',
+            date: new Date().toISOString().split('T')[0],
+            lorry: 'CAB-5678',
+            supervisor: user?.name || 'John Supervisor',
+            route: 'Route B',
+            status: 'scheduled',
+            progress: {
+                '2kg': { loaded: 100, sold: 0, damage: 0, balance: 100 },
+                '5kg': { loaded: 80, sold: 0, damage: 0, balance: 80 },
+                '12.5kg': { loaded: 150, sold: 0, damage: 0, balance: 150 },
+                '37.5kg': { loaded: 10, sold: 0, damage: 0, balance: 10 }
+            }
         }
     ]);
+
+    const handleStartDispatch = (dispatchId) => {
+        setDispatches(prev => prev.map(d =>
+            d.id === dispatchId ? { ...d, status: 'in-progress' } : d
+        ));
+        alert("Trip started! Status updated to 'In Progress'.");
+    };
 
     const [selectedDispatch, setSelectedDispatch] = useState(null);
     const [showProgressModal, setShowProgressModal] = useState(false);
@@ -41,7 +62,7 @@ const SupervisorDispatchView = () => {
 
     const confirmCompletion = () => {
         setDispatches(prev => prev.map(d =>
-            d.id === selectedDispatch.id ? { ...d, status: 'completed' } : d
+            d.id === selectedDispatch.id ? { ...d, status: 'awaiting-unload' } : d
         ));
         setShowProgressModal(false);
         setIsConfirmingCompletion(false);
@@ -94,8 +115,11 @@ const SupervisorDispatchView = () => {
                                             <td>{dispatch.lorry}</td>
                                             <td>{dispatch.route}</td>
                                             <td>
-                                                <span className={`badge ${dispatch.status === 'completed' ? 'badge-success' : 'badge-warning'}`}>
-                                                    {dispatch.status.charAt(0).toUpperCase() + dispatch.status.slice(1).replace('-', ' ')}
+                                                <span className={`badge ${dispatch.status === 'unloaded' ? 'badge-success' :
+                                                    dispatch.status === 'awaiting-unload' ? 'badge-info' :
+                                                        dispatch.status === 'in-progress' ? 'badge-warning' : 'badge-secondary'
+                                                    }`}>
+                                                    {dispatch.status.replace('-', ' ')}
                                                 </span>
                                             </td>
                                             <td>
@@ -107,14 +131,29 @@ const SupervisorDispatchView = () => {
                                                     >
                                                         <Eye size={14} /> View Progress
                                                     </button>
-                                                    {dispatch.status !== 'completed' && (
+
+                                                    {dispatch.status === 'scheduled' && (
+                                                        <button
+                                                            className="btn btn-sm"
+                                                            style={{ backgroundColor: '#101540', color: 'white', display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', borderRadius: '8px', fontSize: '13px', fontWeight: '600' }}
+                                                            onClick={() => handleStartDispatch(dispatch.id)}
+                                                        >
+                                                            Start Dispatch
+                                                        </button>
+                                                    )}
+
+                                                    {dispatch.status === 'in-progress' && (
                                                         <button
                                                             className="btn btn-sm"
                                                             style={{ backgroundColor: '#43e97b', color: '#101540', display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', borderRadius: '8px', fontSize: '13px', fontWeight: '600' }}
                                                             onClick={() => handleMarkComplete(dispatch)}
                                                         >
-                                                            Mark Completed
+                                                            Complete Trip
                                                         </button>
+                                                    )}
+
+                                                    {dispatch.status === 'awaiting-unload' && (
+                                                        <span style={{ fontSize: '12px', color: '#666', fontStyle: 'italic' }}>Pending Admin Unload</span>
                                                     )}
                                                 </div>
                                             </td>

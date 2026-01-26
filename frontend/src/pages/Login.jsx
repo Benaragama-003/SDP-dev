@@ -36,7 +36,7 @@ const Login = () => {
     };
 
     return (
-        
+
         <div className="login-page">
             <div className="login-card">
                 <div className="login-content">
@@ -83,8 +83,8 @@ const Login = () => {
                                 required
                             />
                             <div className="forgot-password-link" align="right">
-                            <Link to="/forgot-password">Forgot Password?</Link>
-                        </div>
+                                <Link to="/forgot-password">Forgot Password?</Link>
+                            </div>
                         </div>
                         <button type="submit" className="login-button" disabled={loading}>
                             {loading ? 'Logging in...' : 'Login'}
@@ -92,7 +92,7 @@ const Login = () => {
                     </form>
 
                     <div className="login-links-container">
-                        
+
                         <div className="register-link">
                             Don't have an account? <Link to="/register">Register here</Link>
                         </div>

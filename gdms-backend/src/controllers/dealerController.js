@@ -68,7 +68,6 @@ const getDealerById = async (req, res, next) => {
       `SELECT 
         dealer_id,
         dealer_name,
-        business_registration_no,
         address,
         contact_number,
         alternative_contact,
@@ -78,8 +77,6 @@ const getDealerById = async (req, res, next) => {
         current_credit,
         (credit_limit - current_credit) as available_credit,
         payment_terms_days,
-        gps_latitude,
-        gps_longitude,
         status,
         notes,
         created_at,
@@ -113,10 +110,7 @@ const createDealer = async (req, res, next) => {
     route,
     credit_limit,
     address,
-    business_registration_no,
     payment_terms_days,
-    gps_latitude,
-    gps_longitude,
     notes
   } = req.body;
 
@@ -160,7 +154,6 @@ const createDealer = async (req, res, next) => {
       `INSERT INTO dealers (
         dealer_id, 
         dealer_name, 
-        business_registration_no,
         address, 
         contact_number,
         alternative_contact,
@@ -169,17 +162,14 @@ const createDealer = async (req, res, next) => {
         credit_limit,
         current_credit,
         payment_terms_days,
-        gps_latitude,
-        gps_longitude,
         status,
         notes,
         created_by
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, 'ACTIVE', ?, ?)`,
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, 'ACTIVE', ?, ?)`,
       [
         dealer_id,
         dealer_name,
-        business_registration_no || null,
         address,
         contact_number,
         alternative_contact || null,
@@ -187,8 +177,6 @@ const createDealer = async (req, res, next) => {
         route || null,
         credit_limit || 0,
         payment_terms_days || 30,
-        gps_latitude || null,
-        gps_longitude || null,
         notes || null,
         created_by
       ]
@@ -241,10 +229,6 @@ const updateDealer = async (req, res, next) => {
       updateFields.push('dealer_name = ?');
       params.push(updateData.dealer_name);
     }
-    if (updateData.business_registration_no !== undefined) {
-      updateFields.push('business_registration_no = ?');
-      params.push(updateData.business_registration_no);
-    }
     if (updateData.address !== undefined) {
       updateFields.push('address = ?');
       params.push(updateData.address);
@@ -272,14 +256,6 @@ const updateDealer = async (req, res, next) => {
     if (updateData.payment_terms_days !== undefined) {
       updateFields.push('payment_terms_days = ?');
       params.push(updateData.payment_terms_days);
-    }
-    if (updateData.gps_latitude !== undefined) {
-      updateFields.push('gps_latitude = ?');
-      params.push(updateData.gps_latitude);
-    }
-    if (updateData.gps_longitude !== undefined) {
-      updateFields.push('gps_longitude = ?');
-      params.push(updateData.gps_longitude);
     }
     if (updateData.status !== undefined) {
       updateFields.push('status = ?');
