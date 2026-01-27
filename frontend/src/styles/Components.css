@@ -225,9 +225,9 @@
 
 .table-actions-cell {
     display: flex;
-    gap: 8px;
+    gap: 6px;
     flex-wrap: wrap;
-    min-width: 200px;
+    min-width: 40px;
 }
 
 .action-btn {

@@ -55,7 +55,7 @@ const PurchaseOrderCreate = () => {
                                 </div>
                                 <div className="form-field">
                                     <label>Expected Date*</label>
-                                    <input type="date" required />
+                                    <input type="date" min={new Date().toISOString().split('T')[0]} required />
                                 </div>
                             </div>
                         </div>

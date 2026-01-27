@@ -123,11 +123,13 @@ const AccountSettings = () => {
                                     <input
                                         type="email"
                                         name="email"
-                                        className="form-input"
+                                        className="form-input read-only"
                                         value={profileData.email}
                                         onChange={handleProfileChange}
+                                        readOnly
                                         required
                                     />
+                                    <small className="form-hint">Email address cannot be changed.</small>
                                 </div>
                                 <div className="form-group">
                                     <label>Phone Number</label>

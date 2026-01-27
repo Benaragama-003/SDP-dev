@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import '../styles/Invoice.css';
 
 const InvoiceCreate = () => {
+    const today = new Date().toISOString().split('T')[0];
     const { user } = useAuth();
     const [searchTerm, setSearchTerm] = useState('');
     const [showDealerDropdown, setShowDealerDropdown] = useState(false);
@@ -193,6 +194,7 @@ const InvoiceCreate = () => {
                                     <input
                                         type="date"
                                         name="date"
+                                        min={today}
                                         value={invoiceData.date}
                                         onChange={handleInputChange}
                                         required
@@ -350,6 +352,7 @@ const InvoiceCreate = () => {
                                             <input
                                                 type="date"
                                                 name="chequeDate"
+                                                min={today}
                                                 value={invoiceData.chequeDate}
                                                 onChange={handleInputChange}
                                                 required

@@ -1,5 +1,3 @@
-// src/controllers/authController.js
-
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const { getConnection } = require('../config/database');
@@ -26,7 +24,7 @@ const generateToken = (user) => {
 //  Create a new supervisor account
 
 const register = async (req, res, next) => {
-  const { username, password, email, phone_number, name } = req.body; // 'name' comes from frontend
+  const { username, password, email, phone_number, name } = req.body;
 
   try {
     const pool = await getConnection();
@@ -41,7 +39,7 @@ const register = async (req, res, next) => {
       return errorResponse(res, 409, 'Username already exists');
     }
 
-    // Check if email already exists (if provided)
+    // Check if email already exists
     if (email) {
       const [existingEmails] = await pool.execute(
         'SELECT user_id FROM users WHERE email = ?',
@@ -62,10 +60,10 @@ const register = async (req, res, next) => {
     );
     let user_id;
     if (lastUser.length > 0) {
-      // 2. Extract the number (e.g., 'S005' -> 5) and increment it
+      // Extract the number (S005(5)) and increment it
       const lastNum = parseInt(lastUser[0].user_id.substring(1));
       const nextNum = lastNum + 1;
-      // 3. Format back to S006 (padded with zeros)
+      // Format back to S006 (padded with zeros)
       user_id = `S${nextNum.toString().padStart(3, '0')}`;
     } else {
       // Starting fresh if no S-prefixed IDs exist
@@ -96,7 +94,7 @@ const register = async (req, res, next) => {
     });
 
     // Return success with user info and token
-    return successResponse(res, 201, 'Registration successful', {
+    return successResponse(res, 201, 'Registration successful. Please wait for an admin to activate your account.', {
       user: {
         user_id,
         username,
@@ -104,9 +102,9 @@ const register = async (req, res, next) => {
         email,
         phone_number,
         role: 'SUPERVISOR',
-        status: 'ACTIVE'
+        status: 'INACTIVE'
       },
-      token  // UI should store this token
+      token  // UI stores this token
     });
 
   } catch (error) {
@@ -387,16 +385,6 @@ const updateProfile = async (req, res, next) => {
       return errorResponse(res, 404, 'User not found');
     }
 
-    // Check if email is already taken by another user
-    if (email) {
-      const [emailCheck] = await pool.execute(
-        'SELECT user_id FROM users WHERE email = ? AND user_id != ?',
-        [email, userId]
-      );
-      if (emailCheck.length > 0) {
-        return errorResponse(res, 409, 'Email is already in use by another account');
-      }
-    }
 
     // Check if username is already taken by another user
     if (username) {
@@ -413,12 +401,11 @@ const updateProfile = async (req, res, next) => {
     await pool.execute(
       `UPDATE users SET 
         full_name = COALESCE(?, full_name), 
-        email = COALESCE(?, email), 
         phone_number = COALESCE(?, phone_number),
         username = COALESCE(?, username),
         updated_at = CURRENT_TIMESTAMP 
        WHERE user_id = ?`,
-      [full_name, email, phone_number, username, userId]
+      [full_name, phone_number, username, userId]
     );
 
     return successResponse(res, 200, 'Profile updated successfully');

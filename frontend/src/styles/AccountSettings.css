@@ -24,7 +24,8 @@
     font-family: 'Poppins', sans-serif;
     font-size: 22px;
     margin-bottom: 25px;
-    color: #14246c; /* Match branding primary color */
+    color: #14246c;
+    /* Match branding primary color */
     border-bottom: 2px solid #f0f0f0;
     padding-bottom: 15px;
 }
@@ -58,9 +59,20 @@
     box-shadow: 0 0 0 3px rgba(20, 36, 108, 0.1);
 }
 
-.settings-form .form-input:disabled {
+.settings-form .form-input:disabled,
+.settings-form .form-input.read-only {
     background-color: #f9f9f9;
-    cursor: not-allowed;
+    cursor: default;
+    color: #666;
+    border-color: #eee;
+}
+
+.form-hint {
+    display: block;
+    margin-top: 5px;
+    color: #888;
+    font-size: 11px;
+    font-style: italic;
 }
 
 .save-btn {
@@ -125,8 +137,15 @@
 }
 
 @keyframes slideDown {
-    from { transform: translateY(-10px); opacity: 0; }
-    to { transform: translateY(0); opacity: 1; }
+    from {
+        transform: translateY(-10px);
+        opacity: 0;
+    }
+
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
 }
 
 @media (max-width: 900px) {

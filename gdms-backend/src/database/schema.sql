@@ -38,6 +38,8 @@ CREATE TABLE lorries (
 
 CREATE TABLE supervisors (
     supervisor_id VARCHAR(20) PRIMARY KEY,
+    access_level INT DEFAULT 0,
+    is_admin BOOLEAN DEFAULT FALSE,
     achieved_sales DECIMAL(10,2) DEFAULT 0,
     monthly_target DECIMAL(12,2) DEFAULT 0,
     status ENUM('AVAILABLE', 'ON_DUTY', 'OFF_DUTY') DEFAULT 'AVAILABLE',
@@ -224,8 +226,6 @@ CREATE TABLE invoices (
     total_amount DECIMAL(10,2) NOT NULL,
     due_date DATE,
     notes TEXT,
-    sms_sent BOOLEAN DEFAULT FALSE,
-    sms_sent_at DATETIME,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (dealer_id) REFERENCES dealers(dealer_id),
@@ -360,64 +360,3 @@ CREATE TABLE lorry_daily_sales (
     INDEX idx_lorry (lorry_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE reports (
-    report_id VARCHAR(20) PRIMARY KEY,
-    report_type ENUM('DAILY_SALES', 'INVENTORY', 'COLLECTION', 'PERFORMANCE', 'CREDIT', 'DISPATCH', 'CUSTOM') NOT NULL,
-    report_name VARCHAR(100) NOT NULL,
-    report_date DATE NOT NULL,
-    date_from DATE,
-    date_to DATE,
-    generated_date DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    generated_by VARCHAR(20) NOT NULL,
-    parameters JSON,
-    file_path VARCHAR(255),
-    file_format ENUM('PDF', 'EXCEL', 'CSV') DEFAULT 'PDF',
-    FOREIGN KEY (generated_by) REFERENCES users(user_id),
-    INDEX idx_type (report_type),
-    INDEX idx_date (report_date)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-CREATE TABLE gps_tracking (
-    tracking_id VARCHAR(20) PRIMARY KEY,
-    lorry_id VARCHAR(20) NOT NULL,
-    latitude DECIMAL(10,8) NOT NULL,
-    longitude DECIMAL(11,8) NOT NULL,
-    tracked_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    speed_kmh DECIMAL(5,2),
-    heading_degrees INT,
-    accuracy_meters DECIMAL(6,2),
-    FOREIGN KEY (lorry_id) REFERENCES lorries(lorry_id) ON DELETE CASCADE,
-    INDEX idx_lorry_time (lorry_id, tracked_at),
-    INDEX idx_time (tracked_at)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-CREATE TABLE audit_log (
-    log_id VARCHAR(20) PRIMARY KEY,
-    table_name VARCHAR(50) NOT NULL,
-    record_id VARCHAR(20) NOT NULL,
-    action ENUM('INSERT', 'UPDATE', 'DELETE') NOT NULL,
-    old_values JSON,
-    new_values JSON,
-    user_id VARCHAR(20),
-    timestamp DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    ip_address VARCHAR(45),
-    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE SET NULL,
-    INDEX idx_table_record (table_name, record_id),
-    INDEX idx_user (user_id),
-    INDEX idx_timestamp (timestamp)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-CREATE TABLE sms_log (
-    sms_id VARCHAR(20) PRIMARY KEY,
-    recipient_number VARCHAR(15) NOT NULL,
-    message TEXT NOT NULL,
-    invoice_id VARCHAR(20),
-    status ENUM('SENT', 'FAILED', 'PENDING') DEFAULT 'PENDING',
-    sent_at DATETIME,
-    error_message VARCHAR(255),
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (invoice_id) REFERENCES invoices(invoice_id) ON DELETE SET NULL,
-    INDEX idx_invoice (invoice_id),
-    INDEX idx_status (status),
-    INDEX idx_sent_at (sent_at)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

@@ -3,7 +3,33 @@ import Sidebar from '../components/Sidebar';
 import { Search, DollarSign, Calendar, Clock, CreditCard } from 'lucide-react';
 import '../styles/Dealers.css';
 
+const MOCK_OUTSTANDING_INVOICES = {
+    'CR-001': [
+        { credit_id: 'INV-101', invoice_number: 'INV-2024-001', remaining_balance: 40000 },
+        { credit_id: 'INV-102', invoice_number: 'INV-2024-005', remaining_balance: 35000 },
+    ],
+    'CR-002': [
+        { credit_id: 'INV-201', invoice_number: 'INV-2024-010', remaining_balance: 180000 },
+    ],
+    'CR-003': [
+        { credit_id: 'INV-301', invoice_number: 'INV-2024-015', remaining_balance: 10000 },
+    ],
+    'CR-004': [
+        { credit_id: 'INV-401', invoice_number: 'INV-2024-020', remaining_balance: 45000 },
+    ],
+};
+
+const formatDate = (dateString) => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = date.getFullYear();
+    return `${day}/${month}/${year}`;
+};
+
 const SupervisorCredit = () => {
+    const today = new Date().toISOString().split('T')[0];
     const [searchTerm, setSearchTerm] = useState('');
 
     const [creditAccounts, setCreditAccounts] = useState([
@@ -15,6 +41,9 @@ const SupervisorCredit = () => {
     const [selectedAccount, setSelectedAccount] = useState(null);
     const [showSettleModal, setShowSettleModal] = useState(false);
     const [showHistoryModal, setShowHistoryModal] = useState(false);
+    const [selectedInvoiceId, setSelectedInvoiceId] = useState('');
+    const [paymentMethod, setPaymentMethod] = useState('CASH'); // 'CASH' or 'CHEQUE'
+    const [chequeDetails, setChequeDetails] = useState({ number: '', bank: '', date: '' });
 
     // Mock history data
     const settlementHistoryData = [
@@ -36,25 +65,37 @@ const SupervisorCredit = () => {
 
     const handleSettlement = (e) => {
         e.preventDefault();
+
+        if (!selectedInvoiceId) {
+            alert("Please select an invoice first!");
+            return;
+        }
+
         const amount = Number(e.target.amount.value);
+        const invoice = MOCK_OUTSTANDING_INVOICES[selectedAccount.id].find(i => i.credit_id === selectedInvoiceId);
+
+        if (amount > invoice.remaining_balance) {
+            alert("Amount cannot exceed invoice balance!");
+            return;
+        }
 
         setCreditAccounts(accounts => accounts.map(acc => {
             if (acc.id === selectedAccount.id) {
-                const newUsed = Math.max(0, acc.used - amount);
-                const newOverdue = Math.max(0, acc.overdue - amount);
+                const newUsed = acc.used - amount;
                 return {
                     ...acc,
                     used: newUsed,
                     available: acc.totalCredit - newUsed,
-                    overdue: newOverdue,
-                    status: newOverdue > 0 ? 'overdue' : 'pending'
+                    // Status logic could be added here
                 };
             }
             return acc;
         }));
 
         setShowSettleModal(false);
-        alert('Payment settled successfully!');
+        setSelectedInvoiceId('');
+        setPaymentMethod('CASH');
+        alert(`Successfully settled Rs. ${amount.toLocaleString()} for ${invoice.invoice_number} via ${paymentMethod}`);
     };
 
     return (
@@ -146,7 +187,7 @@ const SupervisorCredit = () => {
                                                 </span>
                                             </td>
                                             <td>
-                                                <div style={{ display: 'flex', gap: '5px', justifyContent: 'center', flexWrap: 'nowrap' }}>
+                                                <div style={{ display: 'flex', gap: '6px', justifyContent: 'center', flexWrap: 'nowrap' }}>
                                                     <button
                                                         className="btn btn-sm"
                                                         style={{
@@ -155,8 +196,8 @@ const SupervisorCredit = () => {
                                                             border: 'none',
                                                             padding: '6px 12px',
                                                             borderRadius: '6px',
-                                                            fontSize: '12px',
-                                                            fontWeight: '600',
+                                                            fontSize: '11px',
+                                                            fontWeight: '500',
                                                             minWidth: '50px',
                                                             cursor: 'pointer',
                                                             whiteSpace: 'nowrap'
@@ -213,17 +254,96 @@ const SupervisorCredit = () => {
                                             <p style={{ margin: '0', fontSize: '16px', fontWeight: '600', color: '#dc3545' }}>Rs. {selectedAccount.used.toLocaleString()}</p>
                                         </div>
                                     </div>
+
+                                    {/* Invoice Dropdown */}
+                                    <div style={{ marginBottom: '20px' }}>
+                                        <label style={{ display: 'block', color: '#333', fontSize: '14px', fontWeight: '600', marginBottom: '10px' }}>Select Invoice</label>
+                                        <select
+                                            value={selectedInvoiceId}
+                                            onChange={(e) => setSelectedInvoiceId(e.target.value)}
+                                            style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid #ddd', outline: 'none' }}
+                                            required
+                                        >
+                                            <option value="">-- Choose Invoice --</option>
+                                            {(MOCK_OUTSTANDING_INVOICES[selectedAccount.id] || []).map(inv => (
+                                                <option key={inv.credit_id} value={inv.credit_id}>
+                                                    {inv.invoice_number} (Bal: Rs. {inv.remaining_balance.toLocaleString()})
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+
+                                    {/* Payment Method Selector */}
+                                    <div style={{ marginBottom: '20px' }}>
+                                        <label style={{ display: 'block', color: '#333', fontSize: '14px', fontWeight: '600', marginBottom: '10px' }}>Payment Method</label>
+                                        <div style={{ display: 'flex', gap: '30px', padding: '5px 0' }}>
+                                            <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', fontSize: '15px', color: '#444' }}>
+                                                <input
+                                                    type="radio"
+                                                    name="paymentMethod"
+                                                    value="CASH"
+                                                    checked={paymentMethod === 'CASH'}
+                                                    onChange={() => setPaymentMethod('CASH')}
+                                                    style={{ width: '18px', height: '18px', accentColor: '#bfbf2a' }}
+                                                />
+                                                Cash
+                                            </label>
+                                            <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', fontSize: '15px', color: '#444' }}>
+                                                <input
+                                                    type="radio"
+                                                    name="paymentMethod"
+                                                    value="CHEQUE"
+                                                    checked={paymentMethod === 'CHEQUE'}
+                                                    onChange={() => setPaymentMethod('CHEQUE')}
+                                                    style={{ width: '18px', height: '18px', accentColor: '#bfbf2a' }}
+                                                />
+                                                Cheque
+                                            </label>
+                                        </div>
+                                    </div>
+
+                                    {/* Optional Cheque Details */}
+                                    {paymentMethod === 'CHEQUE' && (
+                                        <div style={{ background: '#f8f9fa', padding: '20px', borderRadius: '12px', marginBottom: '20px', border: '1px solid #eee' }}>
+                                            <div style={{ marginBottom: '12px' }}>
+                                                <input
+                                                    type="text"
+                                                    placeholder="Cheque Number"
+                                                    style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #ddd', outline: 'none', boxSizing: 'border-box' }}
+                                                    onChange={(e) => setChequeDetails({ ...chequeDetails, number: e.target.value })}
+                                                    required
+                                                />
+                                            </div>
+                                            <div style={{ marginBottom: '12px' }}>
+                                                <input
+                                                    type="text"
+                                                    placeholder="Bank Name"
+                                                    style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #ddd', outline: 'none', boxSizing: 'border-box' }}
+                                                    onChange={(e) => setChequeDetails({ ...chequeDetails, bank: e.target.value })}
+                                                    required
+                                                />
+                                            </div>
+                                            <div>
+                                                <input
+                                                    type="date"
+                                                    min={today}
+                                                    style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #ddd', outline: 'none', boxSizing: 'border-box' }}
+                                                    onChange={(e) => setChequeDetails({ ...chequeDetails, date: e.target.value })}
+                                                    required
+                                                />
+                                            </div>
+                                        </div>
+                                    )}
+
                                     <div style={{ marginBottom: '30px' }}>
                                         <label style={{ display: 'block', color: '#333', fontSize: '14px', fontWeight: '600', marginBottom: '10px' }}>Payment Amount (Rs)</label>
                                         <input
                                             type="number"
                                             name="amount"
-                                            max={selectedAccount.used}
                                             required
                                             placeholder="Enter settlement amount"
                                             style={{ width: '100%', padding: '12px 15px', borderRadius: '10px', border: '1px solid #ddd', fontSize: '16px', outline: 'none' }}
                                         />
-                                        <p style={{ margin: '8px 0 0 0', fontSize: '12px', color: '#999' }}>Maximum amount: Rs. {selectedAccount.used.toLocaleString()}</p>
                                     </div>
                                     <div style={{ display: 'flex', gap: '15px' }}>
                                         <button
@@ -275,13 +395,20 @@ const SupervisorCredit = () => {
                                                         <td style={{ padding: '12px 15px', fontSize: '14px', color: '#333' }}>
                                                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                                                 <Calendar size={14} color="#999" />
-                                                                {h.date}
+                                                                {formatDate(h.date)}
                                                             </div>
                                                         </td>
                                                         <td style={{ padding: '12px 15px', fontSize: '14px', color: '#333' }}>{h.method}</td>
                                                         <td style={{ padding: '12px 15px', fontSize: '14px', color: '#101540', fontWeight: '600', textAlign: 'right' }}>Rs. {h.amount.toLocaleString()}</td>
                                                     </tr>
                                                 ))}
+                                            {settlementHistoryData.filter(h => h.accountId === selectedAccount.id).length === 0 && (
+                                                <tr>
+                                                    <td colSpan="3" style={{ textAlign: 'center', padding: '40px', color: '#999', fontSize: '14px' }}>
+                                                        No past settlements found for this account.
+                                                    </td>
+                                                </tr>
+                                            )}
                                         </tbody>
                                     </table>
                                 </div>
