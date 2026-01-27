@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { validatePassword, getPasswordErrors } from '../utils/passwordValidator';
@@ -18,7 +18,7 @@ const Register = () => {
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
     const [passwordValidation, setPasswordValidation] = useState(null);
-    const [showPasswordRequirements, setShowPasswordRequirements] = useState(false);
+    const [showPasswordTooltip, setShowPasswordTooltip] = useState(false);
 
     const handleChange = (e) => {
         const { name, value } = e.target;
@@ -82,7 +82,7 @@ const Register = () => {
                 <div className="register-content">
                     <div className="brand-section">
                         <h1 className="brand-title">Hidellana Distributors</h1>
-                    </div>
+                    </div >
 
                     <h2 className="register-heading">Create Supervisor Account</h2>
                     <p className="register-subheading">Register to access the DMS.</p>
@@ -139,7 +139,7 @@ const Register = () => {
                                 type="text"
                                 name="phone_number"
                                 className="form-input"
-                                placeholder="Enter your 10-digit phone number"
+                                placeholder="Enter your 10-digit"
                                 value={formData.phone_number}
                                 onChange={handleChange}
                             />
@@ -154,30 +154,30 @@ const Register = () => {
                                 placeholder="Enter your password"
                                 value={formData.password}
                                 onChange={handleChange}
-                                onFocus={() => setShowPasswordRequirements(true)}
-                                onBlur={() => setShowPasswordRequirements(false)}
+                                onFocus={() => setShowPasswordTooltip(true)}
+                                onBlur={() => setTimeout(() => setShowPasswordTooltip(false), 150)}
                                 required
                             />
-                            {formData.password && passwordValidation && (
+                            {formData.password && passwordValidation && showPasswordTooltip && (
                                 <div className="password-validation">
                                     <div className={`password-strength strength-${passwordValidation.strength}`}>
-                                        Strength: <span>{passwordValidation.strength}</span>
+                                        <span className="strength-text">Strength: <strong>{passwordValidation.strength}</strong></span>
                                     </div>
                                     <ul className="requirements-list">
                                         <li className={passwordValidation.requirements.minLength ? 'met' : 'unmet'}>
-                                            {passwordValidation.requirements.minLength ? '✓' : '✗'} At least 8 characters
+                                            At least 8 characters
                                         </li>
                                         <li className={passwordValidation.requirements.hasUppercase ? 'met' : 'unmet'}>
-                                            {passwordValidation.requirements.hasUppercase ? '✓' : '✗'} One uppercase letter (A-Z)
+                                            Uppercase (A-Z)
                                         </li>
                                         <li className={passwordValidation.requirements.hasLowercase ? 'met' : 'unmet'}>
-                                            {passwordValidation.requirements.hasLowercase ? '✓' : '✗'} One lowercase letter (a-z)
+                                            Lowercase (a-z)
                                         </li>
                                         <li className={passwordValidation.requirements.hasNumber ? 'met' : 'unmet'}>
-                                            {passwordValidation.requirements.hasNumber ? '✓' : '✗'} One number (0-9)
+                                            Number (0-9)
                                         </li>
                                         <li className={passwordValidation.requirements.hasSpecialChar ? 'met' : 'unmet'}>
-                                            {passwordValidation.requirements.hasSpecialChar ? '✓' : '✗'} One special character (!@#$%^&*...)
+                                            Special char (!@#$%...)
                                         </li>
                                     </ul>
                                 </div>
@@ -197,7 +197,7 @@ const Register = () => {
                             />
                         </div>
 
-                        <button type="submit" className="register-button" disabled={loading}>
+                        <button type="submit" className="register-button full-width" disabled={loading}>
                             {loading ? 'Registering...' : 'Register'}
                         </button>
                     </form>

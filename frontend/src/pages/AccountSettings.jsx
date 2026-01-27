@@ -29,6 +29,7 @@ const AccountSettings = () => {
     const [passwordLoading, setPasswordLoading] = useState(false);
     const [passwordMessage, setPasswordMessage] = useState({ type: '', text: '' });
     const [passwordValidation, setPasswordValidation] = useState(null);
+    const [showPasswordRequirements, setShowPasswordRequirements] = useState(false);
 
     const handleProfileChange = (e) => {
         setProfileData({ ...profileData, [e.target.name]: e.target.value });
@@ -202,27 +203,35 @@ const AccountSettings = () => {
                                         required
                                     />
                                     {passwordData.newPassword && passwordValidation && (
-                                        <div className="password-validation">
-                                            <div className={`password-strength strength-${passwordValidation.strength}`}>
-                                                Strength: <span>{passwordValidation.strength}</span>
+                                        <div className={`password-validation ${!passwordValidation.isValid ? 'show-details' : 'compact'}`}>
+                                            <div 
+                                                className={`password-strength strength-${passwordValidation.strength}`}
+                                                role="button"
+                                                tabIndex="0"
+                                                onClick={() => setShowPasswordRequirements(!showPasswordRequirements)}
+                                            >
+                                                <span className="strength-text">Strength: <strong>{passwordValidation.strength}</strong></span>
+                                                <span className="toggle-icon">{showPasswordRequirements ? '▼' : '▶'}</span>
                                             </div>
-                                            <ul className="requirements-list">
-                                                <li className={passwordValidation.requirements.minLength ? 'met' : 'unmet'}>
-                                                    {passwordValidation.requirements.minLength ? '✓' : '✗'} At least 8 characters
-                                                </li>
-                                                <li className={passwordValidation.requirements.hasUppercase ? 'met' : 'unmet'}>
-                                                    {passwordValidation.requirements.hasUppercase ? '✓' : '✗'} One uppercase letter (A-Z)
-                                                </li>
-                                                <li className={passwordValidation.requirements.hasLowercase ? 'met' : 'unmet'}>
-                                                    {passwordValidation.requirements.hasLowercase ? '✓' : '✗'} One lowercase letter (a-z)
-                                                </li>
-                                                <li className={passwordValidation.requirements.hasNumber ? 'met' : 'unmet'}>
-                                                    {passwordValidation.requirements.hasNumber ? '✓' : '✗'} One number (0-9)
-                                                </li>
-                                                <li className={passwordValidation.requirements.hasSpecialChar ? 'met' : 'unmet'}>
-                                                    {passwordValidation.requirements.hasSpecialChar ? '✓' : '✗'} One special character (!@#$%^&*...)
-                                                </li>
-                                            </ul>
+                                            {showPasswordRequirements && (
+                                                <ul className="requirements-list">
+                                                    <li className={passwordValidation.requirements.minLength ? 'met' : 'unmet'}>
+                                                        {passwordValidation.requirements.minLength ? '✓' : '✗'} At least 8 characters
+                                                    </li>
+                                                    <li className={passwordValidation.requirements.hasUppercase ? 'met' : 'unmet'}>
+                                                        {passwordValidation.requirements.hasUppercase ? '✓' : '✗'} Uppercase (A-Z)
+                                                    </li>
+                                                    <li className={passwordValidation.requirements.hasLowercase ? 'met' : 'unmet'}>
+                                                        {passwordValidation.requirements.hasLowercase ? '✓' : '✗'} Lowercase (a-z)
+                                                    </li>
+                                                    <li className={passwordValidation.requirements.hasNumber ? 'met' : 'unmet'}>
+                                                        {passwordValidation.requirements.hasNumber ? '✓' : '✗'} Number (0-9)
+                                                    </li>
+                                                    <li className={passwordValidation.requirements.hasSpecialChar ? 'met' : 'unmet'}>
+                                                        {passwordValidation.requirements.hasSpecialChar ? '✓' : '✗'} Special char (!@#...)
+                                                    </li>
+                                                </ul>
+                                            )}
                                         </div>
                                     )}
                                 </div>

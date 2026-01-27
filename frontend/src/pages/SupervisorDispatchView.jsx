@@ -146,7 +146,7 @@ const SupervisorDispatchView = () => {
                                                     {dispatch.status === 'in-progress' && (
                                                         <button
                                                             className="btn btn-sm"
-                                                            style={{ backgroundColor: '#43e97b', color: '#101540', display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', borderRadius: '8px', fontSize: '13px', fontWeight: '600' }}
+                                                            style={{ backgroundColor: '#e2e221', color: '#101540', display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', borderRadius: '8px', fontSize: '13px', fontWeight: '600' }}
                                                             onClick={() => handleMarkComplete(dispatch)}
                                                         >
                                                             Complete Trip
@@ -243,7 +243,7 @@ const SupervisorDispatchView = () => {
                                     {isConfirmingCompletion && (
                                         <button
                                             onClick={confirmCompletion}
-                                            style={{ flex: 1, backgroundColor: '#43e97b', border: 'none', padding: '12px', borderRadius: '15px', fontSize: '16px', color: '#101540', cursor: 'pointer', fontWeight: '500' }}
+                                            style={{ flex: 1, backgroundColor: '#e2e221', border: 'none', padding: '12px', borderRadius: '15px', fontSize: '16px', color: '#101540', cursor: 'pointer', fontWeight: '500' }}
                                         >
                                             Confirm & Finish
                                         </button>

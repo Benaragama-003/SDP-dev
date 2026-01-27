@@ -43,12 +43,12 @@ const Sidebar = () => {
 
     const navItems = [
         { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-        { path: '/inventory', icon: Package, label: 'Inventory' },
-        { path: '/invoice/create', icon: FileText, label: 'Create Invoice' },
-        { path: '/invoice/view', icon: FileText, label: 'Invoices' },
-        { path: '/dealers', icon: Users, label: 'Dealers' },
-        { path: '/credit/collection', icon: CreditCard, label: 'Credit Collection' },
         { path: '/dispatch/view', icon: Truck, label: 'Dispatch' },
+        { path: '/invoice/create', icon: FileText, label: 'Create Invoice' },
+        { path: '/credit/collection', icon: CreditCard, label: 'Credit Collection' },
+        { path: '/invoice/view', icon: FileText, label: 'Invoices' },
+        { path: '/inventory', icon: Package, label: 'Inventory' },
+        { path: '/dealers', icon: Users, label: 'Dealers' },
         { path: '/sales/view', icon: TrendingUp, label: 'Daily Sales' },
         { path: '/account-settings', icon: Settings, label: 'Account Settings' },
     ];
@@ -70,7 +70,7 @@ const Sidebar = () => {
                 <div className="sidebar-header">
                     <div className="sidebar-logo">
                         {!isCollapsed && <span className="logo-text">Hidellana DMS</span>}
-                        {isCollapsed && <span className="logo-short">HD</span>}
+                        {isCollapsed && <span className="logo-short">DMS  </span>}
                     </div>
                     <button className="sidebar-toggle" onClick={toggleSidebar}>
                         <ChevronRight size={20} />

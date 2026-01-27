@@ -11,7 +11,7 @@ const AdminDashboard = () => {
         { title: 'Active Dealers', value: '42', icon: <Users size={20} />, color: '#00f2fe' },
         { title: 'Active Supervisors', value: '8', icon: <Users size={20} />, color: '#43e97b' },
         { title: 'Dispatches Today', value: '12', icon: <Truck size={20} />, color: '#fa709a' },
-        { title: 'Pending Invoices', value: '18', icon: <FileText size={20} />, color: '#f093fb' },
+        { title: 'Pending Credits', value: 'Rs.45,000', icon: <FileText size={20} />, color: '#f093fb' },
         { title: 'Monthly Revenue', value: 'Rs. 2.5M', icon: <TrendingUp size={20} />, color: '#4facfe' },
     ];
 

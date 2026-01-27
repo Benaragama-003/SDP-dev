@@ -17,7 +17,7 @@ const Dashboard = () => {
     const stats = [
         { title: 'Total Sales', value: 'Rs. 1,500,000', icon: <CreditCard size={20} />, color: '#4facfe' },
         { title: 'Credit', value: 'Rs. 45,000', icon: <DollarSign size={20} />, color: '#00f2fe' },
-        { title: 'Orders', value: '56', icon: <Truck size={20} />, color: '#43e97b' },
+        { title: 'invoices', value: '56', icon: <Truck size={20} />, color: '#43e97b' },
         { title: 'Stock', value: '1,200', icon: <Package size={20} />, color: '#fa709a' },
         { title: 'Active Dealers', value: '366', icon: <Store size={20} />, color: '#70faa7ff' },
     ];

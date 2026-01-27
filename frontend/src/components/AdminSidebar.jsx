@@ -46,16 +46,16 @@ const AdminSidebar = () => {
 
     const navItems = [
         { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-        { path: '/admin/inventory', icon: Package, label: 'Inventory' },
-        { path: '/admin/dealers', icon: Users, label: 'Dealers' },
-        { path: '/admin/supervisors', icon: UserCog, label: 'Supervisors' },
-        { path: '/admin/dispatch', icon: Truck, label: 'Dispatch' },
-        { path: '/admin/lorries', icon: Truck, label: 'Lorries' },
         { path: '/admin/purchase-orders', icon: ShoppingCart, label: 'Purchase Orders' },
+        { path: '/admin/inventory', icon: Package, label: 'Inventory' },
+        { path: '/admin/dispatch', icon: Truck, label: 'Dispatch' },
         { path: '/admin/invoices', icon: FileText, label: 'Invoices' },
-        { path: '/admin/sales', icon: TrendingUp, label: 'Sales' },
         { path: '/admin/cheques', icon: DollarSign, label: 'Cheques' },
         { path: '/admin/credit', icon: CreditCard, label: 'Credit' },
+        { path: '/admin/sales', icon: TrendingUp, label: 'Sales' },
+        { path: '/admin/dealers', icon: Users, label: 'Dealers' },
+        { path: '/admin/supervisors', icon: UserCog, label: 'Supervisors' },
+        { path: '/admin/lorries', icon: Truck, label: 'Lorries' },
         { path: '/account-settings', icon: Settings, label: 'Account Settings' },
     ];
 
@@ -75,8 +75,8 @@ const AdminSidebar = () => {
             <aside className={`sidebar ${isCollapsed ? 'collapsed' : ''} ${isMobileOpen ? 'mobile-open' : ''}`}>
                 <div className="sidebar-header">
                     <div className="sidebar-logo">
-                        {!isCollapsed && <span className="logo-text">Hidellana Admin</span>}
-                        {isCollapsed && <span className="logo-short">HA</span>}
+                        {!isCollapsed && <span className="logo-text">Hidellana DMS</span>}
+                        {isCollapsed && <span className="logo-short">DMS</span>}
                     </div>
                     <button className="sidebar-toggle" onClick={toggleSidebar}>
                         <ChevronRight size={20} />
