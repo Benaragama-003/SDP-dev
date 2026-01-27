@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import Sidebar from '../components/Sidebar';
 import { Search, DollarSign, Calendar, Clock, CreditCard } from 'lucide-react';
 import '../styles/Dealers.css';
+import { formatDate } from '../utils/dateUtils';
+import DateInput from '../components/DateInput';
 
 const MOCK_OUTSTANDING_INVOICES = {
     'CR-001': [
@@ -19,14 +21,7 @@ const MOCK_OUTSTANDING_INVOICES = {
     ],
 };
 
-const formatDate = (dateString) => {
-    if (!dateString) return '';
-    const date = new Date(dateString);
-    const day = String(date.getDate()).padStart(2, '0');
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const year = date.getFullYear();
-    return `${day}/${month}/${year}`;
-};
+
 
 const SupervisorCredit = () => {
     const today = new Date().toISOString().split('T')[0];
@@ -243,7 +238,7 @@ const SupervisorCredit = () => {
                                 <button className="modal-close" onClick={() => setShowSettleModal(false)} style={{ fontSize: '24px', border: 'none', background: 'none', cursor: 'pointer', color: '#999' }}>×</button>
                             </div>
                             <form onSubmit={handleSettlement}>
-                                <div style={{ padding: '30px' }}>
+                                <div style={{ padding: '30px', marginTop: '-50px', minHeight: '400px' }}>
                                     <div style={{ marginBottom: '25px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
                                         <div>
                                             <label style={{ display: 'block', color: '#666', fontSize: '13px', marginBottom: '5px' }}>Dealer</label>
@@ -284,7 +279,7 @@ const SupervisorCredit = () => {
                                                     value="CASH"
                                                     checked={paymentMethod === 'CASH'}
                                                     onChange={() => setPaymentMethod('CASH')}
-                                                    style={{ width: '18px', height: '18px', accentColor: '#bfbf2a' }}
+                                                    style={{ width: '18px', height: '18px' }}
                                                 />
                                                 Cash
                                             </label>
@@ -295,7 +290,7 @@ const SupervisorCredit = () => {
                                                     value="CHEQUE"
                                                     checked={paymentMethod === 'CHEQUE'}
                                                     onChange={() => setPaymentMethod('CHEQUE')}
-                                                    style={{ width: '18px', height: '18px', accentColor: '#bfbf2a' }}
+                                                    style={{ width: '18px', height: '18px' }}
                                                 />
                                                 Cheque
                                             </label>
@@ -304,39 +299,37 @@ const SupervisorCredit = () => {
 
                                     {/* Optional Cheque Details */}
                                     {paymentMethod === 'CHEQUE' && (
-                                        <div style={{ background: '#f8f9fa', padding: '20px', borderRadius: '12px', marginBottom: '20px', border: '1px solid #eee' }}>
-                                            <div style={{ marginBottom: '12px' }}>
+                                        <div style={{ background: '#f8f9fa', padding: '15px', borderRadius: '12px', marginBottom: '15px', border: '1px solid #eee' }}>
+                                            <div style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
                                                 <input
                                                     type="text"
                                                     placeholder="Cheque Number"
-                                                    style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #ddd', outline: 'none', boxSizing: 'border-box' }}
+                                                    style={{ flex: 1, padding: '10px', borderRadius: '8px', border: '1px solid #ddd', outline: 'none', fontSize: '14px' }}
                                                     onChange={(e) => setChequeDetails({ ...chequeDetails, number: e.target.value })}
                                                     required
                                                 />
-                                            </div>
-                                            <div style={{ marginBottom: '12px' }}>
                                                 <input
                                                     type="text"
                                                     placeholder="Bank Name"
-                                                    style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #ddd', outline: 'none', boxSizing: 'border-box' }}
+                                                    style={{ flex: 1, padding: '10px', borderRadius: '8px', border: '1px solid #ddd', outline: 'none', fontSize: '14px' }}
                                                     onChange={(e) => setChequeDetails({ ...chequeDetails, bank: e.target.value })}
                                                     required
                                                 />
                                             </div>
                                             <div>
-                                                <input
-                                                    type="date"
+                                                <DateInput
+                                                    value={chequeDetails.date}
                                                     min={today}
-                                                    style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #ddd', outline: 'none', boxSizing: 'border-box' }}
-                                                    onChange={(e) => setChequeDetails({ ...chequeDetails, date: e.target.value })}
+                                                    onChange={(value) => setChequeDetails({ ...chequeDetails, date: value })}
                                                     required
+                                                    style={{ padding: '10px', borderRadius: '8px', border: '1px solid #ddd', fontSize: '14px', outline: 'none' }}
                                                 />
                                             </div>
                                         </div>
                                     )}
 
-                                    <div style={{ marginBottom: '30px' }}>
-                                        <label style={{ display: 'block', color: '#333', fontSize: '14px', fontWeight: '600', marginBottom: '10px' }}>Payment Amount (Rs)</label>
+                                    <div style={{ marginBottom: '20px' }}>
+                                        <label style={{ display: 'block', color: '#333', fontSize: '14px', fontWeight: '600', marginBottom: '8px' }}>Payment Amount (Rs)</label>
                                         <input
                                             type="number"
                                             name="amount"

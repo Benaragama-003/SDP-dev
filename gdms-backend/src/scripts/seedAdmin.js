@@ -8,7 +8,7 @@ const seedAdmin = async () => {
         username: process.env.INITIAL_ADMIN_USERNAME || 'admin_official',
         name: 'Hidellana Admin',
         email: process.env.INITIAL_ADMIN_EMAIL || 'distributors.hidellana@gmail.com',
-        password: process.env.INITIAL_ADMIN_PASSWORD || 'Hidellana123',
+        password: process.env.INITIAL_ADMIN_PASSWORD || 'Hidellana@2026',
         role: 'ADMIN'
     };
 

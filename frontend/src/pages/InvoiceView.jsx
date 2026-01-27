@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import Sidebar from '../components/Sidebar';
 import AdminSidebar from '../components/AdminSidebar';
 import { Search, Eye, Download, FileText, Calendar, User, CreditCard } from 'lucide-react';
+import { formatDate } from '../utils/dateUtils';
 import '../styles/Invoice.css';
 
 const InvoiceView = () => {
@@ -105,7 +106,7 @@ const InvoiceView = () => {
                                 {filteredInvoices.map((invoice) => (
                                     <tr key={invoice.id}>
                                         <td style={{ fontWeight: '600' }}>{invoice.id}</td>
-                                        <td>{invoice.date}</td>
+                                        <td>{formatDate(invoice.date)}</td>
                                         <td>{invoice.dealer}</td>
                                         <td style={{ fontWeight: '500' }}>Rs. {invoice.total.toLocaleString()}</td>
                                         <td>{invoice.paymentType}</td>
@@ -150,7 +151,7 @@ const InvoiceView = () => {
                                             <Calendar size={14} />
                                             <span style={{ fontSize: '11px', fontWeight: 'bold', textTransform: 'uppercase' }}>Issued Date</span>
                                         </div>
-                                        <p style={{ margin: '0', fontSize: '16px', fontWeight: '600', color: '#333' }}>{selectedInvoice.date}</p>
+                                        <p style={{ margin: '0', fontSize: '16px', fontWeight: '600', color: '#333' }}>{formatDate(selectedInvoice.date)}</p>
                                     </div>
                                     <div>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#999', marginBottom: '8px' }}>

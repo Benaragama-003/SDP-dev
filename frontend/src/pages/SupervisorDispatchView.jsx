@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import Sidebar from '../components/Sidebar';
 import { Search, Eye } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { formatDate } from '../utils/dateUtils';
 import '../styles/Dispatch.css';
 
 const SupervisorDispatchView = () => {
@@ -111,7 +112,7 @@ const SupervisorDispatchView = () => {
                                     {filtered.map((dispatch) => (
                                         <tr key={dispatch.id}>
                                             <td style={{ fontWeight: '600' }}>{dispatch.id}</td>
-                                            <td>{dispatch.date}</td>
+                                            <td>{formatDate(dispatch.date)}</td>
                                             <td>{dispatch.lorry}</td>
                                             <td>{dispatch.route}</td>
                                             <td>

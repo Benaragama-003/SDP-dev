@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { validatePassword, getPasswordErrors } from '../utils/passwordValidator';
 import '../styles/Register.css';
 
 const Register = () => {
@@ -16,13 +17,22 @@ const Register = () => {
     });
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
+    const [passwordValidation, setPasswordValidation] = useState(null);
+    const [showPasswordRequirements, setShowPasswordRequirements] = useState(false);
 
     const handleChange = (e) => {
+        const { name, value } = e.target;
         setFormData({
             ...formData,
-            [e.target.name]: e.target.value
+            [name]: value
         });
         setError('');
+
+        // Validate password in real-time
+        if (name === 'password') {
+            const validation = validatePassword(value);
+            setPasswordValidation(validation);
+        }
     };
 
     const handleSubmit = async (e) => {
@@ -40,8 +50,11 @@ const Register = () => {
             return;
         }
 
-        if (formData.password.length < 6) {
-            setError('Password must be at least 6 characters');
+        // Validate password requirements
+        const validation = validatePassword(formData.password);
+        if (!validation.isValid) {
+            const errors = getPasswordErrors(validation.requirements);
+            setError('Password must contain: ' + errors.join(', '));
             return;
         }
 
@@ -141,8 +154,34 @@ const Register = () => {
                                 placeholder="Enter your password"
                                 value={formData.password}
                                 onChange={handleChange}
+                                onFocus={() => setShowPasswordRequirements(true)}
+                                onBlur={() => setShowPasswordRequirements(false)}
                                 required
                             />
+                            {formData.password && passwordValidation && (
+                                <div className="password-validation">
+                                    <div className={`password-strength strength-${passwordValidation.strength}`}>
+                                        Strength: <span>{passwordValidation.strength}</span>
+                                    </div>
+                                    <ul className="requirements-list">
+                                        <li className={passwordValidation.requirements.minLength ? 'met' : 'unmet'}>
+                                            {passwordValidation.requirements.minLength ? '✓' : '✗'} At least 8 characters
+                                        </li>
+                                        <li className={passwordValidation.requirements.hasUppercase ? 'met' : 'unmet'}>
+                                            {passwordValidation.requirements.hasUppercase ? '✓' : '✗'} One uppercase letter (A-Z)
+                                        </li>
+                                        <li className={passwordValidation.requirements.hasLowercase ? 'met' : 'unmet'}>
+                                            {passwordValidation.requirements.hasLowercase ? '✓' : '✗'} One lowercase letter (a-z)
+                                        </li>
+                                        <li className={passwordValidation.requirements.hasNumber ? 'met' : 'unmet'}>
+                                            {passwordValidation.requirements.hasNumber ? '✓' : '✗'} One number (0-9)
+                                        </li>
+                                        <li className={passwordValidation.requirements.hasSpecialChar ? 'met' : 'unmet'}>
+                                            {passwordValidation.requirements.hasSpecialChar ? '✓' : '✗'} One special character (!@#$%^&*...)
+                                        </li>
+                                    </ul>
+                                </div>
+                            )}
                         </div>
 
                         <div className="form-group">

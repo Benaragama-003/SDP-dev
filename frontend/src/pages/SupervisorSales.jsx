@@ -3,6 +3,7 @@ import Sidebar from '../components/Sidebar';
 import { TrendingUp, Download } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import '../styles/Dashboard.css';
+import { formatDate } from '../utils/dateUtils';
 
 const SupervisorSales = () => {
     const { user } = useAuth();
@@ -104,7 +105,7 @@ const SupervisorSales = () => {
                             <tbody>
                                 {supervisorSales.map((sale, index) => (
                                     <tr key={index}>
-                                        <td>{sale.date}</td>
+                                        <td>{formatDate(sale.date)}</td>
                                         <td>{sale.lorry}</td>
                                         <td>{sale.itemsCount}</td>
                                         <td>Rs. {sale.amount.toLocaleString()}</td>
@@ -136,7 +137,7 @@ const SupervisorSales = () => {
                                     </div>
                                     <div>
                                         <p style={{ fontSize: '12px', color: '#666' }}>Date</p>
-                                        <p style={{ fontWeight: '600' }}>{selectedSale.date}</p>
+                                        <p style={{ fontWeight: '600' }}>{formatDate(selectedSale.date)}</p>
                                     </div>
                                 </div>
 

@@ -2,7 +2,9 @@ import React, { useState, useEffect } from 'react';
 import Sidebar from '../components/Sidebar';
 import { Save, Plus } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import DateInput from '../components/DateInput';
 import '../styles/Invoice.css';
+import { formatDate } from '../utils/dateUtils';
 
 const InvoiceCreate = () => {
     const today = new Date().toISOString().split('T')[0];
@@ -191,12 +193,10 @@ const InvoiceCreate = () => {
                                 </div>
                                 <div className="form-field">
                                     <label>Date*</label>
-                                    <input
-                                        type="date"
-                                        name="date"
-                                        min={today}
+                                    <DateInput
                                         value={invoiceData.date}
-                                        onChange={handleInputChange}
+                                        min={today}
+                                        onChange={(value) => setInvoiceData({ ...invoiceData, date: value })}
                                         required
                                     />
                                 </div>
@@ -349,12 +349,11 @@ const InvoiceCreate = () => {
                                         </div>
                                         <div className="form-field">
                                             <label>Cheque Date*</label>
-                                            <input
-                                                type="date"
-                                                name="chequeDate"
-                                                min={today}
+                                            <label>Cheque Date*</label>
+                                            <DateInput
                                                 value={invoiceData.chequeDate}
-                                                onChange={handleInputChange}
+                                                min={today}
+                                                onChange={(value) => setInvoiceData({ ...invoiceData, chequeDate: value })}
                                                 required
                                             />
                                         </div>

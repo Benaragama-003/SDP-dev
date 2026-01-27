@@ -3,11 +3,14 @@ import { useNavigate } from 'react-router-dom';
 import AdminSidebar from '../../components/AdminSidebar';
 import { MapPin, Truck, Plus, FileText } from 'lucide-react';
 import '../../styles/Dispatch.css';
+import { formatDate } from '../../utils/dateUtils';
+import DateInput from '../../components/DateInput';
 
 const AdminDispatch = () => {
     const navigate = useNavigate();
     const [selectedSupervisors, setSelectedSupervisors] = useState([]);
     const [allocatedItems, setAllocatedItems] = useState([{ product_id: '', quantity: '' }]);
+    const [dispatchDate, setDispatchDate] = useState(new Date().toISOString().split('T')[0]);
 
     // Mock supervisor data with locations
     const supervisors = [
@@ -116,7 +119,12 @@ const AdminDispatch = () => {
 
                                 <div className="form-field">
                                     <label>Dispatch Date*</label>
-                                    <input type="date" required defaultValue={new Date().toISOString().split('T')[0]} />
+                                    <DateInput
+                                        value={dispatchDate}
+                                        onChange={setDispatchDate}
+                                        min={new Date().toISOString().split('T')[0]}
+                                        required
+                                    />
                                 </div>
                             </div>
 
@@ -212,7 +220,7 @@ const AdminDispatch = () => {
                                         ].map((dispatch) => (
                                             <tr key={dispatch.id}>
                                                 <td style={{ fontWeight: '600' }}>{dispatch.id}</td>
-                                                <td>{dispatch.date}</td>
+                                                <td>{formatDate(dispatch.date)}</td>
                                                 <td>{dispatch.lorry}</td>
                                                 <td>{dispatch.supervisor}</td>
                                                 <td>

@@ -3,11 +3,14 @@ import { useNavigate } from 'react-router-dom';
 import AdminSidebar from '../../components/AdminSidebar';
 import { Save, X } from 'lucide-react';
 import '../../styles/Inventory.css';
+import { formatDate } from '../../utils/dateUtils';
+import DateInput from '../../components/DateInput';
 
 const PurchaseOrderCreate = () => {
     const navigate = useNavigate();
     const [supplier, setSupplier] = useState('');
     const [items, setItems] = useState([{ product: '', type: 'Filled', quantity: '', unitPrice: '' }]);
+    const [expectedDate, setExpectedDate] = useState('');
 
     const handleAddItem = () => {
         setItems([...items, { product: '', type: 'Filled', quantity: '', unitPrice: '' }]);
@@ -55,7 +58,12 @@ const PurchaseOrderCreate = () => {
                                 </div>
                                 <div className="form-field">
                                     <label>Expected Date*</label>
-                                    <input type="date" min={new Date().toISOString().split('T')[0]} required />
+                                    <DateInput
+                                        value={expectedDate}
+                                        onChange={setExpectedDate}
+                                        min={new Date().toISOString().split('T')[0]}
+                                        required
+                                    />
                                 </div>
                             </div>
                         </div>

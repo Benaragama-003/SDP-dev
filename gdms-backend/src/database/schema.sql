@@ -114,29 +114,6 @@ CREATE TABLE lorry_stock (
     INDEX idx_lorry (lorry_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE stock_adjustments (
-    adjustment_id VARCHAR(20) PRIMARY KEY,
-    adjustment_date DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    adjustment_type ENUM('PHYSICAL_COUNT', 'DAMAGE', 'TRANSFER', 'CORRECTION') NOT NULL,
-    product_id VARCHAR(20) NOT NULL,
-    location_type ENUM('WAREHOUSE', 'LORRY') NOT NULL,
-    location_id VARCHAR(20),
-    previous_quantity INT NOT NULL,
-    new_quantity INT NOT NULL,
-    variance INT NOT NULL,
-    reason TEXT,
-    status ENUM('PENDING', 'APPROVED', 'REJECTED') DEFAULT 'PENDING',
-    created_by VARCHAR(20) NOT NULL,
-    approved_by VARCHAR(20),
-    approved_date DATETIME,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (product_id) REFERENCES products(product_id),
-    FOREIGN KEY (created_by) REFERENCES users(user_id),
-    FOREIGN KEY (approved_by) REFERENCES users(user_id) ON DELETE SET NULL,
-    INDEX idx_status (status),
-    INDEX idx_date (adjustment_date)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
 CREATE TABLE purchase_orders (
     order_id VARCHAR(20) PRIMARY KEY,
     order_number VARCHAR(50) UNIQUE NOT NULL,
@@ -269,14 +246,6 @@ CREATE TABLE payments (
     INDEX idx_date (payment_date)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE cash_payments (
-    cash_payment_id VARCHAR(20) PRIMARY KEY,
-    cash_received DECIMAL(10,2) NOT NULL,
-    change_given DECIMAL(10,2) DEFAULT 0,
-    denomination_notes TEXT,
-    FOREIGN KEY (cash_payment_id) REFERENCES payments(payment_id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
 CREATE TABLE cheque_payments (
     cheque_payment_id VARCHAR(20) PRIMARY KEY,
     cheque_number VARCHAR(50) NOT NULL,
@@ -325,21 +294,6 @@ CREATE TABLE credit_settlements (
     FOREIGN KEY (collected_by) REFERENCES supervisors(supervisor_id),
     INDEX idx_credit (credit_id),
     INDEX idx_date (settlement_date)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-CREATE TABLE daily_sales_summary (
-    summary_id VARCHAR(20) PRIMARY KEY,
-    sales_date DATE UNIQUE NOT NULL,
-    total_sales DECIMAL(10,2) NOT NULL DEFAULT 0,
-    total_cash DECIMAL(10,2) NOT NULL DEFAULT 0,
-    total_cheque DECIMAL(10,2) NOT NULL DEFAULT 0,
-    total_credit DECIMAL(10,2) NOT NULL DEFAULT 0,
-    total_bank_transfer DECIMAL(10,2) NOT NULL DEFAULT 0,
-    total_invoices INT NOT NULL DEFAULT 0,
-    total_dealers_served INT NOT NULL DEFAULT 0,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    INDEX idx_date (sales_date)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE lorry_daily_sales (

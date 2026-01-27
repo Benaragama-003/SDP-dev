@@ -154,6 +154,79 @@
     text-decoration: underline;
 }
 
+/* Password Validation Styles */
+.password-validation {
+    background-color: #f9f9f9;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    padding: 12px 16px;
+    margin-top: 8px;
+    width: 100%;
+    font-size: 13px;
+}
+
+.password-strength {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+    font-weight: 600;
+    font-family: 'Poppins', sans-serif;
+}
+
+.password-strength span {
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-weight: 700;
+}
+
+.strength-weak span {
+    background-color: #ffebee;
+    color: #c62828;
+}
+
+.strength-fair span {
+    background-color: #fff3e0;
+    color: #e65100;
+}
+
+.strength-good span {
+    background-color: #e8f5e9;
+    color: #2e7d32;
+}
+
+.strength-strong span {
+    background-color: #c8e6c9;
+    color: #1b5e20;
+}
+
+.requirements-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.requirements-list li {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: 'Poppins', sans-serif;
+    font-size: 12px;
+    transition: color 0.2s;
+}
+
+.requirements-list li.met {
+    color: #2e7d32;
+    font-weight: 500;
+}
+
+.requirements-list li.unmet {
+    color: #c62828;
+}
+
 /* Responsive Adjustments */
 @media (max-width: 768px) {
     .register-card {

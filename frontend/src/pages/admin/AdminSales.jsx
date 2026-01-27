@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import AdminSidebar from '../../components/AdminSidebar';
 import { Search, Download, TrendingUp } from 'lucide-react';
 import '../../styles/Dashboard.css';
+import { formatDate } from '../../utils/dateUtils';
 
 const AdminSales = () => {
     const [dateRange, setDateRange] = useState('today');
@@ -119,7 +120,7 @@ const AdminSales = () => {
                             <tbody>
                                 {salesList.map((sale, index) => (
                                     <tr key={index}>
-                                        <td>{sale.date}</td>
+                                        <td>{formatDate(sale.date)}</td>
                                         <td>{sale.lorry}</td>
                                         <td>{sale.supervisor}</td>
                                         <td>{sale.items}</td>

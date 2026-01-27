@@ -37,10 +37,10 @@ const registerValidation = [
     .withMessage('Username can only contain letters, numbers, and underscores'),
 
   body('password')
-    .isLength({ min: 6 })
-    .withMessage('Password must be at least 6 characters long')
-    .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/)
-    .withMessage('Password must contain at least one uppercase letter, one lowercase letter, and one number'),
+    .isLength({ min: 8 })
+    .withMessage('Password must be at least 8 characters long')
+    .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{};:'",.<>?\/\\|`~])/)
+    .withMessage('Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character (!@#$%^&*()_+-=[]{};\':\",./<>?\\/|`~)'),
 
   body('email')
     .isEmail()
@@ -72,10 +72,10 @@ const updatePasswordValidation = [
     .withMessage('Current password is required'),
 
   body('newPassword')
-    .isLength({ min: 6 })
-    .withMessage('New password must be at least 6 characters long')
-    .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/)
-    .withMessage('Password must contain at least one uppercase letter, one lowercase letter, and one number')
+    .isLength({ min: 8 })
+    .withMessage('New password must be at least 8 characters long')
+    .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{};:'",.<>?\/\\|`~])/)
+    .withMessage('Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character (!@#$%^&*()_+-=[]{};\':",.<>?\/|`~)')
 ];
 
 //Register new supervisor account
@@ -102,7 +102,11 @@ router.post('/forgot-password', [
 // Reset Password (Public)
 router.post('/reset-password', [
   body('token').notEmpty().withMessage('Token is required'),
-  body('newPassword').isLength({ min: 6 }).withMessage('Password must be at least 6 characters long')
+  body('newPassword')
+    .isLength({ min: 8 })
+    .withMessage('Password must be at least 8 characters long')
+    .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{};:'",.<>?\/\\|`~])/)
+    .withMessage('Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character (!@#$%^&*()_+-=[]{};\':",.<>?\/|`~)')
 ], validate, resetPassword);
 
 // Update Profile (Protected)

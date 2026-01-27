@@ -146,7 +146,7 @@ const AdminInventoryAdd = () => {
                                 type="button"
                                 onClick={() => navigate('/admin/inventory')}
                                 disabled={loading}
-                                style={{ backgroundColor: '#6b7280', color: 'white', border: 'none', padding: '10px 25px', borderRadius: '10px', fontWeight: '600', cursor: 'pointer' }}
+                                style={{ backgroundColor: '#ff0000', color: 'white', border: 'none', padding: '10px 25px', borderRadius: '10px', fontWeight: '600', cursor: 'pointer' }}
                             >
                                 Cancel
                             </button>

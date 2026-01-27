@@ -146,7 +146,7 @@ const AdminCheques = () => {
                                             <select name="status" defaultValue={selectedCheque.status} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #ddd' }} required>
                                                 <option value="pending">Pending</option>
                                                 <option value="cleared">Cleared</option>
-                                                <option value="bounced">Bounced</option>
+                                                <option value="Returned">Returned</option>
                                             </select>
                                             <div style={{ marginTop: '20px', display: 'flex', gap: '10px' }}>
                                                 <button type="button" className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setShowUpdateModal(false)}>Cancel</button>

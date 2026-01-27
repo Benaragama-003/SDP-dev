@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { authApi } from '../services/api';
+import { validatePassword, getPasswordErrors } from '../utils/passwordValidator';
 import Sidebar from '../components/Sidebar';
 import AdminSidebar from '../components/AdminSidebar';
 import '../styles/Dashboard.css';
@@ -27,13 +28,21 @@ const AccountSettings = () => {
     });
     const [passwordLoading, setPasswordLoading] = useState(false);
     const [passwordMessage, setPasswordMessage] = useState({ type: '', text: '' });
+    const [passwordValidation, setPasswordValidation] = useState(null);
 
     const handleProfileChange = (e) => {
         setProfileData({ ...profileData, [e.target.name]: e.target.value });
     };
 
     const handlePasswordChange = (e) => {
-        setPasswordData({ ...passwordData, [e.target.name]: e.target.value });
+        const { name, value } = e.target;
+        setPasswordData({ ...passwordData, [name]: value });
+
+        // Validate new password in real-time
+        if (name === 'newPassword') {
+            const validation = validatePassword(value);
+            setPasswordValidation(validation);
+        }
     };
 
     const handleProfileSubmit = async (e) => {
@@ -61,12 +70,21 @@ const AccountSettings = () => {
             return;
         }
 
+        // Validate password requirements
+        const validation = validatePassword(passwordData.newPassword);
+        if (!validation.isValid) {
+            const errors = getPasswordErrors(validation.requirements);
+            setPasswordMessage({ type: 'error', text: 'Password must contain: ' + errors.join(', ') });
+            return;
+        }
+
         setPasswordLoading(true);
 
         try {
             await authApi.updatePassword(passwordData.currentPassword, passwordData.newPassword);
             setPasswordMessage({ type: 'success', text: 'Password changed successfully!' });
             setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
+            setPasswordValidation(null);
         } catch (err) {
             setPasswordMessage({ type: 'error', text: err.response?.data?.message || 'Failed to change password' });
         } finally {
@@ -183,6 +201,30 @@ const AccountSettings = () => {
                                         onChange={handlePasswordChange}
                                         required
                                     />
+                                    {passwordData.newPassword && passwordValidation && (
+                                        <div className="password-validation">
+                                            <div className={`password-strength strength-${passwordValidation.strength}`}>
+                                                Strength: <span>{passwordValidation.strength}</span>
+                                            </div>
+                                            <ul className="requirements-list">
+                                                <li className={passwordValidation.requirements.minLength ? 'met' : 'unmet'}>
+                                                    {passwordValidation.requirements.minLength ? '✓' : '✗'} At least 8 characters
+                                                </li>
+                                                <li className={passwordValidation.requirements.hasUppercase ? 'met' : 'unmet'}>
+                                                    {passwordValidation.requirements.hasUppercase ? '✓' : '✗'} One uppercase letter (A-Z)
+                                                </li>
+                                                <li className={passwordValidation.requirements.hasLowercase ? 'met' : 'unmet'}>
+                                                    {passwordValidation.requirements.hasLowercase ? '✓' : '✗'} One lowercase letter (a-z)
+                                                </li>
+                                                <li className={passwordValidation.requirements.hasNumber ? 'met' : 'unmet'}>
+                                                    {passwordValidation.requirements.hasNumber ? '✓' : '✗'} One number (0-9)
+                                                </li>
+                                                <li className={passwordValidation.requirements.hasSpecialChar ? 'met' : 'unmet'}>
+                                                    {passwordValidation.requirements.hasSpecialChar ? '✓' : '✗'} One special character (!@#$%^&*...)
+                                                </li>
+                                            </ul>
+                                        </div>
+                                    )}
                                 </div>
                                 <div className="form-group">
                                     <label>Confirm New Password</label>
