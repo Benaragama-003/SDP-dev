@@ -20,8 +20,7 @@ const DealerAdd = () => {
         address: '',
         route: '',
         credit_limit: '',
-        payment_terms_days: '30',
-        notes: ''
+        payment_terms_days: '30'
     });
 
     const handleChange = (e) => {
@@ -47,8 +46,7 @@ const DealerAdd = () => {
                 alternative_contact: dealerData.alternative_contact || undefined,
                 email: dealerData.email || undefined,
                 credit_limit: dealerData.credit_limit ? Number(dealerData.credit_limit) : 0,
-                payment_terms_days: dealerData.payment_terms_days ? Number(dealerData.payment_terms_days) : 30,
-                notes: dealerData.notes || undefined
+                payment_terms_days: dealerData.payment_terms_days ? Number(dealerData.payment_terms_days) : 30
             };
 
             const response = await dealerApi.createDealer(dataToSubmit);
@@ -163,16 +161,6 @@ const DealerAdd = () => {
                                     onChange={handleChange}
                                     required
                                     rows={3}
-                                />
-                            </div>
-                            <div className="form-field full-width">
-                                <label>Notes</label>
-                                <textarea
-                                    name="notes"
-                                    value={dealerData.notes}
-                                    onChange={handleChange}
-                                    rows={3}
-                                    placeholder="Additional information about the dealer"
                                 />
                             </div>
                         </div>

@@ -8,9 +8,9 @@ const getAllDealers = async (req, res, next) => {
   try {
     const pool = await getConnection();
 
-    // Get search parameter from query string
-    // Example: /dealers?search=ABC Stores
-    const { search } = req.query;
+    // Get search and status parameters from query string
+    // Example: /dealers?search=ABC Stores&status=ACTIVE
+    const { search, status } = req.query;
 
     // Build SQL query
     let query = `
@@ -32,6 +32,13 @@ const getAllDealers = async (req, res, next) => {
     `;
 
     const params = [];
+    
+    // Filter by status if provided
+    if (status) {
+      query += ` AND status = ?`;
+      params.push(status);
+    }
+    
     if (search) {
       query += ` AND (
         dealer_name LIKE ? OR 
@@ -78,7 +85,6 @@ const getDealerById = async (req, res, next) => {
         (credit_limit - current_credit) as available_credit,
         payment_terms_days,
         status,
-        notes,
         created_at,
         updated_at
       FROM dealers 
@@ -110,8 +116,7 @@ const createDealer = async (req, res, next) => {
     route,
     credit_limit,
     address,
-    payment_terms_days,
-    notes
+    payment_terms_days
   } = req.body;
 
   try {
@@ -163,10 +168,9 @@ const createDealer = async (req, res, next) => {
         current_credit,
         payment_terms_days,
         status,
-        notes,
         created_by
       )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, 'ACTIVE', ?, ?)`,
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, 'ACTIVE', ?)`,
       [
         dealer_id,
         dealer_name,
@@ -177,7 +181,6 @@ const createDealer = async (req, res, next) => {
         route || null,
         credit_limit || 0,
         payment_terms_days || 30,
-        notes || null,
         created_by
       ]
     );
@@ -261,10 +264,6 @@ const updateDealer = async (req, res, next) => {
       updateFields.push('status = ?');
       params.push(updateData.status);
     }
-    if (updateData.notes !== undefined) {
-      updateFields.push('notes = ?');
-      params.push(updateData.notes);
-    }
 
     // Step 3: If no fields to update, return error
     if (updateFields.length === 0) {
@@ -347,6 +346,54 @@ const deleteDealer = async (req, res, next) => {
 };
 
 // ============================================
+// TOGGLE DEALER STATUS
+// ============================================
+// Purpose: Toggle dealer between ACTIVE and INACTIVE
+// Route: PATCH /api/v1/dealers/:id/toggle-status
+const toggleDealerStatus = async (req, res, next) => {
+  const { id } = req.params;
+
+  try {
+    const pool = await getConnection();
+
+    // Step 1: Check if dealer exists and get current status
+    const [existingDealer] = await pool.execute(
+      'SELECT dealer_id, dealer_name, status FROM dealers WHERE dealer_id = ?',
+      [id]
+    );
+
+    if (existingDealer.length === 0) {
+      return errorResponse(res, 404, 'Dealer not found');
+    }
+
+    const currentStatus = existingDealer[0].status;
+    const newStatus = currentStatus === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
+
+    // Step 2: Update status
+    // Admin can deactivate for various reasons:
+    // - Dealer not operating anymore
+    // - Credit limit exceeded and not paying
+    // - Admin wants to prevent supervisor from invoicing to this dealer
+    await pool.execute(
+      'UPDATE dealers SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE dealer_id = ?',
+      [newStatus, id]
+    );
+
+    // Step 3: Return success with new status
+    const action = newStatus === 'ACTIVE' ? 'activated' : 'inactivated';
+    return successResponse(res, 200, `Dealer ${action} successfully`, {
+      dealer_id: id,
+      dealer_name: existingDealer[0].dealer_name,
+      previous_status: currentStatus,
+      new_status: newStatus
+    });
+
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ============================================
 // GET DEALER STATISTICS
 // ============================================
 // Purpose: Get dealer summary for dashboard
@@ -382,5 +429,6 @@ module.exports = {
   createDealer,
   updateDealer,
   deleteDealer,
+  toggleDealerStatus,
   getDealerStats
 };

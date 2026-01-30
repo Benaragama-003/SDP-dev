@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import Sidebar from '../components/Sidebar';
-import { Save, Plus } from 'lucide-react';
+import { Save, Plus, Loader2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import DateInput from '../components/DateInput';
+import { dealerApi } from '../services/api';
 import '../styles/Invoice.css';
 import { formatDate } from '../utils/dateUtils';
 
@@ -11,14 +12,24 @@ const InvoiceCreate = () => {
     const { user } = useAuth();
     const [searchTerm, setSearchTerm] = useState('');
     const [showDealerDropdown, setShowDealerDropdown] = useState(false);
+    const [dealers, setDealers] = useState([]);
+    const [loadingDealers, setLoadingDealers] = useState(true);
 
-    // Mock dealers data
-    const dealers = [
-        { id: 'D001', name: 'ABC Stores', contact: '0771234567', route: 'Route A' },
-        { id: 'D002', name: 'XYZ Mart', contact: '0777654321', route: 'Route B' },
-        { id: 'D003', name: 'LMN Distributors', contact: '0769876543', route: 'Route A' },
-        { id: 'D004', name: 'PQR Suppliers', contact: '0775432167', route: 'Route C' },
-    ];
+    // Fetch only ACTIVE dealers from backend
+    useEffect(() => {
+        const fetchActiveDealers = async () => {
+            try {
+                setLoadingDealers(true);
+                const response = await dealerApi.getActiveDealers();
+                setDealers(response.data.data || []);
+            } catch (err) {
+                console.error('Error fetching dealers:', err);
+            } finally {
+                setLoadingDealers(false);
+            }
+        };
+        fetchActiveDealers();
+    }, []);
 
     // Mock active dispatch data
     const activeDispatch = {
@@ -70,17 +81,18 @@ const InvoiceCreate = () => {
     const handleDealerSelect = (dealer) => {
         setInvoiceData({
             ...invoiceData,
-            dealer: dealer.name,
-            route: dealer.route,
-            telephone: dealer.contact
+            dealer: dealer.dealer_name,
+            dealerId: dealer.dealer_id,
+            route: dealer.route || '',
+            telephone: dealer.contact_number
         });
-        setSearchTerm(dealer.name);
+        setSearchTerm(dealer.dealer_name);
         setShowDealerDropdown(false);
     };
 
     const filteredDealers = dealers.filter(d =>
-        d.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        d.id.toLowerCase().includes(searchTerm.toLowerCase())
+        d.dealer_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        d.dealer_id.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
     const getTotalAmount = () => {
@@ -130,19 +142,23 @@ const InvoiceCreate = () => {
                                     />
                                     {showDealerDropdown && searchTerm && (
                                         <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: 'white', border: '1px solid #ddd', borderRadius: '8px', zIndex: 10, maxHeight: '200px', overflowY: 'auto', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
-                                            {filteredDealers.map(dealer => (
+                                            {loadingDealers ? (
+                                                <div style={{ padding: '10px 15px', textAlign: 'center' }}>
+                                                    <Loader2 size={20} style={{ animation: 'spin 1s linear infinite' }} />
+                                                </div>
+                                            ) : filteredDealers.map(dealer => (
                                                 <div
-                                                    key={dealer.id}
+                                                    key={dealer.dealer_id}
                                                     onClick={() => handleDealerSelect(dealer)}
                                                     style={{ padding: '10px 15px', cursor: 'pointer', borderBottom: '1px solid #eee' }}
                                                     onMouseOver={(e) => e.target.style.background = '#f5f5f5'}
                                                     onMouseOut={(e) => e.target.style.background = 'white'}
                                                 >
-                                                    <strong>{dealer.name}</strong> <span style={{ fontSize: '12px', color: '#666' }}>({dealer.id})</span>
+                                                    <strong>{dealer.dealer_name}</strong> <span style={{ fontSize: '12px', color: '#666' }}>({dealer.dealer_id})</span>
                                                 </div>
                                             ))}
-                                            {filteredDealers.length === 0 && (
-                                                <div style={{ padding: '10px 15px', color: '#999' }}>No dealers found</div>
+                                            {!loadingDealers && filteredDealers.length === 0 && (
+                                                <div style={{ padding: '10px 15px', color: '#999' }}>No active dealers found</div>
                                             )}
                                         </div>
                                     )}
@@ -325,12 +341,7 @@ const InvoiceCreate = () => {
                                             style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #ddd' }}
                                         />
                                     </div>
-                                    <div style={{ marginTop: '10px', display: 'flex', justifyContent: 'space-between', fontSize: '14px' }}>
-                                        <span style={{ color: '#666' }}>Balance to return:</span>
-                                        <span style={{ fontWeight: 'bold', color: (parseFloat(invoiceData.paidAmount) || 0) - getTotalAmount() >= 0 ? '#2e7d32' : '#dc3545' }}>
-                                            Rs. {Math.max(0, (parseFloat(invoiceData.paidAmount) || 0) - getTotalAmount()).toLocaleString()}
-                                        </span>
-                                    </div>
+
                                 </div>
                             )}
 
@@ -348,7 +359,7 @@ const InvoiceCreate = () => {
                                             />
                                         </div>
                                         <div className="form-field">
-                                            <label>Cheque Date*</label>
+
                                             <label>Cheque Date*</label>
                                             <DateInput
                                                 value={invoiceData.chequeDate}

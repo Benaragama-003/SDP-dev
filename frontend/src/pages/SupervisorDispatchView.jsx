@@ -14,7 +14,7 @@ const SupervisorDispatchView = () => {
             id: 'D001',
             date: new Date().toISOString().split('T')[0],
             lorry: 'CAA-1234',
-            supervisor: user?.name || 'John Supervisor',
+            supervisor: user?.name || 'Chamika Denuwan',
             route: 'Route A',
             status: 'in-progress',
             progress: {
@@ -28,7 +28,7 @@ const SupervisorDispatchView = () => {
             id: 'D002',
             date: new Date().toISOString().split('T')[0],
             lorry: 'CAB-5678',
-            supervisor: user?.name || 'John Supervisor',
+            supervisor: user?.name || 'Nethindu Chandula',
             route: 'Route B',
             status: 'scheduled',
             progress: {

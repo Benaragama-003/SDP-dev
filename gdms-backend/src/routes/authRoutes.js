@@ -15,6 +15,7 @@ const {
   resetPassword,
   updateProfile,
   getAllSupervisors,
+  getAvailableSupervisors,
   updateSupervisorStatus,
   promoteToAdmin
 } = require('../controllers/authController');
@@ -24,10 +25,15 @@ const router = express.Router();
 
 // Register validation
 const registerValidation = [
-  body('name')
+  body('first_name')
     .trim()
-    .isLength({ min: 2, max: 100 })
-    .withMessage('Full name must be between 2 and 100 characters'),
+    .isLength({ min: 2, max: 50 })
+    .withMessage('First name must be between 2 and 50 characters'),
+
+  body('last_name')
+    .trim()
+    .isLength({ min: 2, max: 50 })
+    .withMessage('Last name must be between 2 and 50 characters'),
 
   body('username')
     .trim()
@@ -117,6 +123,9 @@ router.put('/profile', authenticateToken, [
 
 // Admin only: Get all supervisors
 router.get('/supervisors', authenticateToken, checkRole(['ADMIN']), getAllSupervisors);
+
+// Admin only: Get available supervisors (for dispatch dropdown)
+router.get('/supervisors/available', authenticateToken, checkRole(['ADMIN']), getAvailableSupervisors);
 
 // Super Admin (Level 1) only: Update supervisor status (activation)
 router.patch('/supervisors/:id/status', authenticateToken, checkRole(['ADMIN'], 1), updateSupervisorStatus);

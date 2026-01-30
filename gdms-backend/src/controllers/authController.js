@@ -10,21 +10,21 @@ const { sendResetEmail } = require('../utils/emailService');
 const generateToken = (user) => {
   return jwt.sign(
     {
-      userId: user.user_id,      // User's unique ID
-      username: user.username,   // Username
-      role: user.role,           // ADMIN or SUPERVISOR
-      email: user.email,         // Email address
-      accessLevel: user.access_level || null // Level 1 (Full) or Level 2 (Restricted)
+      userId: user.user_id,     
+      username: user.username,   
+      role: user.role,           
+      email: user.email,         
+      accessLevel: user.access_level || null 
     },
-    process.env.JWT_SECRET,      // Secret key to sign token
-    { expiresIn: process.env.JWT_EXPIRE || '7d' }  // Token expires in 7 days
+    process.env.JWT_SECRET,     
+    { expiresIn: process.env.JWT_EXPIRE || '1d' }  // Token expires in 1 day
   );
 };
 
 //  Create a new supervisor account
 
 const register = async (req, res, next) => {
-  const { username, password, email, phone_number, name } = req.body;
+  const { username, password, email, phone_number, first_name, last_name } = req.body;
 
   try {
     const pool = await getConnection();
@@ -72,9 +72,9 @@ const register = async (req, res, next) => {
 
     // Insert into users table
     await pool.execute(
-      `INSERT INTO users (user_id, username, full_name, password_hash, email, phone_number, role, status)
-       VALUES (?, ?, ?, ?, ?, ?, 'SUPERVISOR', 'INACTIVE')`,
-      [user_id, username, name, password_hash, email, phone_number]
+      `INSERT INTO users (user_id, username, first_name, last_name, password_hash, email, phone_number, role, status)
+       VALUES (?, ?, ?, ?, ?, ?, ?, 'SUPERVISOR', 'INACTIVE')`,
+      [user_id, username, first_name, last_name, password_hash, email, phone_number]
     );
 
     // Insert into supervisors table
@@ -88,7 +88,8 @@ const register = async (req, res, next) => {
     const token = generateToken({
       user_id,
       username,
-      full_name: name,
+      first_name,
+      last_name,
       role: 'SUPERVISOR',
       email
     });
@@ -98,7 +99,8 @@ const register = async (req, res, next) => {
       user: {
         user_id,
         username,
-        full_name: name,
+        first_name,
+        last_name,
         email,
         phone_number,
         role: 'SUPERVISOR',
@@ -122,7 +124,7 @@ const login = async (req, res, next) => {
 
     // Find user by username or email
     const [users] = await pool.execute(
-      `SELECT user_id, username, full_name, password_hash, email, phone_number, role, status 
+      `SELECT user_id, username, first_name, last_name, password_hash, email, phone_number, role, status 
        FROM users 
        WHERE username = ? OR email = ?`,
       [username, username]
@@ -214,7 +216,7 @@ const getProfile = async (req, res, next) => {
 
     // Get user data
     const [users] = await pool.execute(
-      `SELECT user_id, username, full_name, email, phone_number, role, status, created_date, last_login 
+      `SELECT user_id, username, first_name, last_name, email, phone_number, role, status, created_date, last_login 
        FROM users 
        WHERE user_id = ?`,
       [userId]
@@ -373,7 +375,7 @@ const resetPassword = async (req, res, next) => {
 
 // Update user profile information
 const updateProfile = async (req, res, next) => {
-  const { full_name, email, phone_number, username } = req.body;
+  const { first_name, last_name, email, phone_number, username } = req.body;
   const userId = req.user.userId;
 
   try {
@@ -400,12 +402,13 @@ const updateProfile = async (req, res, next) => {
     // Update user record
     await pool.execute(
       `UPDATE users SET 
-        full_name = COALESCE(?, full_name), 
+        first_name = COALESCE(?, first_name),
+        last_name = COALESCE(?, last_name), 
         phone_number = COALESCE(?, phone_number),
         username = COALESCE(?, username),
         updated_at = CURRENT_TIMESTAMP 
        WHERE user_id = ?`,
-      [full_name, phone_number, username, userId]
+      [first_name, last_name, phone_number, username, userId]
     );
 
     return successResponse(res, 200, 'Profile updated successfully');
@@ -427,38 +430,88 @@ const getAllSupervisors = async (req, res, next) => {
   try {
     const pool = await getConnection();
     const [supervisors] = await pool.execute(`
-  SELECT u.user_id, u.username, u.full_name, u.email, u.phone_number, u.role, u.status, 
-         s.monthly_target, s.achieved_sales
-  FROM users u
-  LEFT JOIN supervisors s ON u.user_id = s.supervisor_id
-  WHERE u.role = 'SUPERVISOR'
-  ORDER BY u.created_date DESC
-`);
+      SELECT u.user_id, u.username, u.first_name, u.last_name, 
+             CONCAT(u.first_name, ' ', u.last_name) AS full_name,
+             u.email, u.phone_number, u.role, u.status AS account_status, 
+             s.monthly_target, s.achieved_sales,
+             CASE 
+               WHEN EXISTS (
+                 SELECT 1 FROM dispatches d 
+                 WHERE d.supervisor_id = u.user_id 
+                 AND d.status IN ('SCHEDULED', 'IN_PROGRESS')
+               ) THEN 'ON_DUTY'
+               ELSE 'AVAILABLE'
+             END AS work_status
+      FROM users u
+      LEFT JOIN supervisors s ON u.user_id = s.supervisor_id
+      WHERE u.role = 'SUPERVISOR'
+      ORDER BY u.created_date DESC
+    `);
     return successResponse(res, 200, 'Supervisors retrieved successfully', supervisors);
   } catch (error) {
     next(error);
   }
 };
 
-// Update supervisor status/activation (Admin only)
+// Get available supervisors for dispatch dropdown (Admin only)
+const getAvailableSupervisors = async (req, res, next) => {
+  try {
+    const pool = await getConnection();
+    const [supervisors] = await pool.execute(`
+        SELECT u.user_id, CONCAT(u.first_name, ' ', u.last_name) AS full_name,
+              u.phone_number
+        FROM users u
+        INNER JOIN supervisors s ON u.user_id = s.supervisor_id
+        WHERE u.role = 'SUPERVISOR' 
+          AND u.status = 'ACTIVE'
+          AND NOT EXISTS (
+              SELECT 1 FROM dispatches d 
+              WHERE d.supervisor_id = u.user_id 
+              AND d.status IN ('SCHEDULED', 'IN_PROGRESS')
+          )
+        ORDER BY u.first_name
+    `);
+    return successResponse(res, 200, 'Available supervisors retrieved', supervisors);
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Update supervisor status/activation and monthly target (Admin only)
 const updateSupervisorStatus = async (req, res, next) => {
   const { id } = req.params;
-  const { status } = req.body;
+  const { status, monthly_target } = req.body;
 
   try {
     const pool = await getConnection();
 
-    // Update the status in the users table
-    const [result] = await pool.execute(
-      'UPDATE users SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ? AND role = "SUPERVISOR"',
-      [status, id]
+    // Check if supervisor exists
+    const [existing] = await pool.execute(
+      'SELECT user_id FROM users WHERE user_id = ? AND role = "SUPERVISOR"',
+      [id]
     );
 
-    if (result.affectedRows === 0) {
+    if (existing.length === 0) {
       return errorResponse(res, 404, 'Supervisor not found');
     }
 
-    return successResponse(res, 200, `Supervisor status updated to ${status}`);
+    // Update account status in users table (ACTIVE/INACTIVE)
+    if (status) {
+      await pool.execute(
+        'UPDATE users SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ?',
+        [status.toUpperCase(), id]
+      );
+    }
+
+    // Update monthly_target in supervisors table
+    if (monthly_target !== undefined) {
+      await pool.execute(
+        'UPDATE supervisors SET monthly_target = ? WHERE supervisor_id = ?',
+        [monthly_target, id]
+      );
+    }
+
+    return successResponse(res, 200, 'Supervisor updated successfully');
   } catch (error) {
     next(error);
   }
@@ -523,6 +576,7 @@ module.exports = {
   resetPassword,
   updateProfile,
   getAllSupervisors,
+  getAvailableSupervisors,
   updateSupervisorStatus,
   promoteToAdmin
 };

@@ -49,6 +49,9 @@ export const dealerApi = {
     // Get all dealers with optional search parameter
     getAllDealers: (search = '') => api.get(`/dealers${search ? `?search=${search}` : ''}`),
 
+    // Get only active dealers (for invoice creation)
+    getActiveDealers: () => api.get('/dealers?status=ACTIVE'),
+
     // Get dealer by ID
     getDealerById: (id) => api.get(`/dealers/${id}`),
 
@@ -60,6 +63,9 @@ export const dealerApi = {
 
     // Update existing dealer
     updateDealer: (id, dealerData) => api.put(`/dealers/${id}`, dealerData),
+
+    // Toggle dealer status (activate/deactivate)
+    toggleDealerStatus: (id) => api.patch(`/dealers/${id}/toggle-status`),
 
     // Delete dealer (soft delete - sets status to INACTIVE)
     deleteDealer: (id) => api.delete(`/dealers/${id}`),

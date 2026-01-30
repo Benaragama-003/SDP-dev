@@ -11,7 +11,7 @@ const DispatchView = () => {
             id: 'D001',
             date: '2026-01-15',
             lorry: 'CAA-1234',
-            supervisor: 'John Supervisor',
+            supervisor: 'Chamika Denuwan',
             route: 'Route A',
             status: 'completed',
             progress: {
@@ -24,7 +24,7 @@ const DispatchView = () => {
             id: 'D002',
             date: '2026-01-15',
             lorry: 'CAB-5678',
-            supervisor: 'Jane Smith',
+            supervisor: 'Nethindu Chandula',
             route: 'Route B',
             status: 'in-progress',
             progress: {
@@ -37,7 +37,7 @@ const DispatchView = () => {
             id: 'D003',
             date: '2026-01-14',
             lorry: 'CAC-9012',
-            supervisor: 'Mike Johnson',
+            supervisor: 'Akila Benaragama',
             route: 'Route C',
             status: 'completed',
             progress: {

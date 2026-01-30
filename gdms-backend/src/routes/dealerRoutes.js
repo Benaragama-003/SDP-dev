@@ -9,6 +9,7 @@ const {
   createDealer,
   updateDealer,
   deleteDealer,
+  toggleDealerStatus,
   getDealerStats
 } = require('../controllers/dealerController');
 
@@ -117,6 +118,9 @@ router.post('/', createDealerValidation, validate, createDealer);
 
 //update an exisiting dealer route
 router.put('/:id', updateDealerValidation, validate, updateDealer);
+
+// toggle dealer status (activate/deactivate)
+router.patch('/:id/toggle-status', checkRole('ADMIN'), toggleDealerStatus);
 
 // delete dealer route
 router.delete('/:id', checkRole('ADMIN'), deleteDealer);

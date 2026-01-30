@@ -31,7 +31,9 @@ export const AuthProvider = ({ children }) => {
                     const userData = response.data.data;
                     const userSession = {
                         ...userData,
-                        name: userData.full_name || userData.username
+                        name: userData.first_name && userData.last_name 
+                            ? `${userData.first_name} ${userData.last_name}` 
+                            : userData.username
                     };
                     setUser(userSession);
                     localStorage.setItem('dms_user', JSON.stringify(userSession));
@@ -60,7 +62,9 @@ export const AuthProvider = ({ children }) => {
 
             const userSession = {
                 ...userData,
-                name: userData.full_name || userData.username
+                name: userData.first_name && userData.last_name 
+                    ? `${userData.first_name} ${userData.last_name}` 
+                    : userData.username
             };
 
             setUser(userSession);
@@ -75,14 +79,15 @@ export const AuthProvider = ({ children }) => {
     };
 
     // Real register function
-    const register = async (name, username, email, password, phone_number) => {
+    const register = async (first_name, last_name, username, email, password, phone_number) => {
         try {
             const response = await api.post('/auth/register', {
                 username,
                 password,
                 email,
                 phone_number,
-                name // Note: backend schema might need 'name' if not already there, but let's send what we have
+                first_name,
+                last_name
             });
 
             return { success: true, message: 'Registration successful' };

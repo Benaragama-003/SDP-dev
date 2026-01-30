@@ -23,8 +23,7 @@ const DealerUpdate = () => {
         route: '',
         credit_limit: '',
         payment_terms_days: '',
-        status: 'ACTIVE',
-        notes: ''
+        status: 'ACTIVE'
     });
 
     useEffect(() => {
@@ -47,8 +46,7 @@ const DealerUpdate = () => {
                 route: dealer.route || '',
                 credit_limit: dealer.credit_limit || '',
                 payment_terms_days: dealer.payment_terms_days || '',
-                status: dealer.status || 'ACTIVE',
-                notes: dealer.notes || ''
+                status: dealer.status || 'ACTIVE'
             });
         } catch (err) {
             console.error('Error fetching dealer:', err);
@@ -82,8 +80,7 @@ const DealerUpdate = () => {
                 email: dealerData.email || undefined,
                 credit_limit: dealerData.credit_limit ? Number(dealerData.credit_limit) : undefined,
                 payment_terms_days: dealerData.payment_terms_days ? Number(dealerData.payment_terms_days) : undefined,
-                status: dealerData.status,
-                notes: dealerData.notes || undefined
+                status: dealerData.status
             };
 
             await dealerApi.updateDealer(id, dataToSubmit);
@@ -210,16 +207,6 @@ const DealerUpdate = () => {
                                     onChange={handleChange}
                                     required
                                     rows={3}
-                                />
-                            </div>
-                            <div className="form-field full-width">
-                                <label>Notes</label>
-                                <textarea
-                                    name="notes"
-                                    value={dealerData.notes}
-                                    onChange={handleChange}
-                                    rows={3}
-                                    placeholder="Additional information about the dealer"
                                 />
                             </div>
                         </div>

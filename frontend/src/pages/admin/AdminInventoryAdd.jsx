@@ -12,10 +12,11 @@ const AdminInventoryAdd = () => {
 
     const [formData, setFormData] = useState({
         cylinder_size: '',
-        supplier_filled_price: '',
-        supplier_new_price: '',
-        dealer_filled_price: '',
-        dealer_new_price: '',
+        filled_purchase_price: '',
+        new_purchase_price: '',
+        filled_selling_price: '',
+        new_selling_price: '',
+        cylinder_deposit: '',
         initial_quantity: '0',
         description: ''
     });
@@ -75,48 +76,58 @@ const AdminInventoryAdd = () => {
 
                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
                                     <div className="form-field">
-                                        <label>Supplier Filled Price (Rs)*</label>
+                                        <label>Filled Purchase Price (Rs)*</label>
                                         <input
                                             type="number"
                                             required
                                             placeholder="0.00"
-                                            value={formData.supplier_filled_price}
-                                            onChange={(e) => setFormData({ ...formData, supplier_filled_price: e.target.value })}
+                                            value={formData.filled_purchase_price}
+                                            onChange={(e) => setFormData({ ...formData, filled_purchase_price: e.target.value })}
                                         />
                                     </div>
                                     <div className="form-field">
-                                        <label>Supplier New Price (Rs)*</label>
+                                        <label>New Purchase Price (Rs)*</label>
                                         <input
                                             type="number"
                                             required
                                             placeholder="0.00"
-                                            value={formData.supplier_new_price}
-                                            onChange={(e) => setFormData({ ...formData, supplier_new_price: e.target.value })}
+                                            value={formData.new_purchase_price}
+                                            onChange={(e) => setFormData({ ...formData, new_purchase_price: e.target.value })}
                                         />
                                     </div>
                                 </div>
 
                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
                                     <div className="form-field">
-                                        <label>Dealer Filled Price (Rs)*</label>
+                                        <label>Filled Selling Price (Rs)*</label>
                                         <input
                                             type="number"
                                             required
                                             placeholder="0.00"
-                                            value={formData.dealer_filled_price}
-                                            onChange={(e) => setFormData({ ...formData, dealer_filled_price: e.target.value })}
+                                            value={formData.filled_selling_price}
+                                            onChange={(e) => setFormData({ ...formData, filled_selling_price: e.target.value })}
                                         />
                                     </div>
                                     <div className="form-field">
-                                        <label>Dealer New Price (Rs)*</label>
+                                        <label>New Selling Price (Rs)*</label>
                                         <input
                                             type="number"
                                             required
                                             placeholder="0.00"
-                                            value={formData.dealer_new_price}
-                                            onChange={(e) => setFormData({ ...formData, dealer_new_price: e.target.value })}
+                                            value={formData.new_selling_price}
+                                            onChange={(e) => setFormData({ ...formData, new_selling_price: e.target.value })}
                                         />
                                     </div>
+                                </div>
+
+                                <div className="form-field">
+                                    <label>Cylinder Deposit (Rs)</label>
+                                    <input
+                                        type="number"
+                                        placeholder="0.00"
+                                        value={formData.cylinder_deposit}
+                                        onChange={(e) => setFormData({ ...formData, cylinder_deposit: e.target.value })}
+                                    />
                                 </div>
 
                                 <div className="form-field">

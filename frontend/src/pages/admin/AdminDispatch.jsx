@@ -14,9 +14,9 @@ const AdminDispatch = () => {
 
     // Mock supervisor data with locations
     const supervisors = [
-        { id: 'S001', name: 'John Supervisor', route: 'Route A', location: { lat: 6.9271, lng: 79.8612 }, status: 'available' },
-        { id: 'S002', name: 'Jane Smith', route: 'Route B', location: { lat: 6.9319, lng: 79.8478 }, status: 'on-duty' },
-        { id: 'S003', name: 'Mike Johnson', route: 'Route C', location: { lat: 6.9022, lng: 79.8607 }, status: 'available' },
+        { id: 'S001', name: 'Chamika Denuwan', route: 'Route A', location: { lat: 6.9271, lng: 79.8612 }, status: 'available' },
+        { id: 'S002', name: 'Nethindu Chandula', route: 'Route B', location: { lat: 6.9319, lng: 79.8478 }, status: 'on-duty' },
+        { id: 'S003', name: 'Akila Benaragama', route: 'Route C', location: { lat: 6.9022, lng: 79.8607 }, status: 'available' },
     ];
 
     const lorries = [

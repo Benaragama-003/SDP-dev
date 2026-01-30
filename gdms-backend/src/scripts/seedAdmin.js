@@ -6,7 +6,8 @@ const { generateId } = require('../utils/generateId');
 const seedAdmin = async () => {
     const adminDetails = {
         username: process.env.INITIAL_ADMIN_USERNAME || 'admin_official',
-        name: 'Hidellana Admin',
+        first_name: 'Hidellana',
+        last_name: 'Admin',
         email: process.env.INITIAL_ADMIN_EMAIL || 'distributors.hidellana@gmail.com',
         password: process.env.INITIAL_ADMIN_PASSWORD || 'Hidellana@2026',
         role: 'ADMIN'
@@ -15,16 +16,7 @@ const seedAdmin = async () => {
     try {
         const pool = await getConnection();
 
-        // Step 1: Ensure full_name column exists (migration)
-        console.log('Checking database schema...');
-        const [columns] = await pool.execute('SHOW COLUMNS FROM users LIKE "full_name"');
-        if (columns.length === 0) {
-            console.log('Adding missing full_name column to users table...');
-            await pool.execute('ALTER TABLE users ADD COLUMN full_name VARCHAR(100) AFTER username');
-            console.log('Column added successfully');
-        }
-
-        // Step 2: Check if user already exists
+        // Check if user already exists
         const [existing] = await pool.execute(
             'SELECT user_id FROM users WHERE email = ?',
             [adminDetails.email]
@@ -40,9 +32,9 @@ const seedAdmin = async () => {
 
         // Insert into users
         await pool.execute(
-            `INSERT INTO users (user_id, username, full_name, password_hash, email, role, status)
-       VALUES (?, ?, ?, ?, ?, ?, 'ACTIVE')`,
-            [user_id, adminDetails.username, adminDetails.name, password_hash, adminDetails.email, adminDetails.role]
+            `INSERT INTO users (user_id, username, first_name, last_name, password_hash, email, role, status)
+       VALUES (?, ?, ?, ?, ?, ?, ?, 'ACTIVE')`,
+            [user_id, adminDetails.username, adminDetails.first_name, adminDetails.last_name, password_hash, adminDetails.email, adminDetails.role]
         );
 
         // Insert into admins

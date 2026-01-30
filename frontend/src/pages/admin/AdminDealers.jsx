@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import AdminSidebar from '../../components/AdminSidebar';
-import { Search, Plus, Edit2, Trash2, Loader2 } from 'lucide-react';
+import { Search, Plus, Edit2, Eye, ToggleLeft, ToggleRight } from 'lucide-react';
 import { dealerApi } from '../../services/api';
 import '../../styles/Dealers.css';
 
@@ -11,7 +11,9 @@ const AdminDealers = () => {
     const [dealers, setDealers] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
-    const [deleting, setDeleting] = useState(null);
+    const [toggling, setToggling] = useState(null);
+    const [showDetailsModal, setShowDetailsModal] = useState(false);
+    const [selectedDealer, setSelectedDealer] = useState(null);
 
     // Fetch dealers from backend
     useEffect(() => {
@@ -43,19 +45,20 @@ const AdminDealers = () => {
         return () => clearTimeout(delaySearch);
     }, [searchTerm]);
 
-    const handleDelete = async (dealerId) => {
-        if (window.confirm('Are you sure you want to delete this dealer? This will set their status to INACTIVE.')) {
+    const handleToggleStatus = async (dealer) => {
+        const action = dealer.status === 'ACTIVE' ? 'inactivate' : 'activate';
+        if (window.confirm(`Are you sure you want to ${action} this dealer?`)) {
             try {
-                setDeleting(dealerId);
-                await dealerApi.deleteDealer(dealerId);
-                alert('Dealer deleted successfully!');
+                setToggling(dealer.dealer_id);
+                const response = await dealerApi.toggleDealerStatus(dealer.dealer_id);
+                alert(response.data.message);
                 // Refresh the dealer list
                 fetchDealers();
             } catch (err) {
-                console.error('Error deleting dealer:', err);
-                alert(err.response?.data?.message || 'Failed to delete dealer');
+                console.error('Error toggling dealer status:', err);
+                alert(err.response?.data?.message || 'Failed to update dealer status');
             } finally {
-                setDeleting(null);
+                setToggling(null);
             }
         }
     };
@@ -106,7 +109,7 @@ const AdminDealers = () => {
 
                         {loading ? (
                             <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '40px' }}>
-                                <Loader2 size={40} className="spinner" style={{ animation: 'spin 1s linear infinite' }} />
+                                <p>Loading dealers...</p>
                             </div>
                         ) : error ? (
                             <div style={{ padding: '20px', textAlign: 'center', color: '#dc3545' }}>
@@ -150,22 +153,32 @@ const AdminDealers = () => {
                                             <td>
                                                 <div className="table-actions-cell">
                                                     <button
+                                                        className="action-btn"
+                                                        onClick={() => { setSelectedDealer(dealer); setShowDetailsModal(true); }}
+                                                        title="View Details"
+                                                        style={{ padding: '6px 10px', borderRadius: '6px', border: 'none', backgroundColor: '#6b7280', color: 'white' }}
+                                                    >
+                                                        <Eye size={16} />
+                                                    </button>
+                                                    <button
                                                         className="action-btn action-btn-edit"
                                                         onClick={() => navigate(`/admin/dealers/update/${dealer.dealer_id}`)}
                                                     >
                                                         <Edit2 size={16} /> Edit
                                                     </button>
                                                     <button
-                                                        className="action-btn action-btn-delete"
-                                                        onClick={() => handleDelete(dealer.dealer_id)}
-                                                        disabled={deleting === dealer.dealer_id}
+                                                        className={`action-btn ${dealer.status === 'ACTIVE' ? 'action-btn-delete' : 'action-btn-success'}`}
+                                                        onClick={() => handleToggleStatus(dealer)}
+                                                        disabled={toggling === dealer.dealer_id}
+                                                        title={dealer.status === 'ACTIVE' ? 'Deactivate Dealer' : 'Activate Dealer'}
+                                                        style={dealer.status !== 'ACTIVE' ? { backgroundColor: '#10b981', color: 'white' } : {}}
                                                     >
-                                                        {deleting === dealer.dealer_id ? (
-                                                            <Loader2 size={16} className="spinner" style={{ animation: 'spin 1s linear infinite' }} />
+                                                        {dealer.status === 'ACTIVE' ? (
+                                                            <ToggleRight size={16} />
                                                         ) : (
-                                                            <Trash2 size={16} />
+                                                            <ToggleLeft size={16} />
                                                         )}
-                                                        {deleting === dealer.dealer_id ? ' Deleting...' : ' Delete'}
+                                                        {toggling === dealer.dealer_id ? ' Updating...' : (dealer.status === 'ACTIVE' ? ' Deactivate' : ' Activate')}
                                                     </button>
                                                 </div>
                                             </td>
@@ -176,6 +189,61 @@ const AdminDealers = () => {
                         )}
                     </div>
                 </main>
+
+                {showDetailsModal && selectedDealer && (
+                    <div className="modal-overlay" onClick={() => setShowDetailsModal(false)}>
+                        <div className="modal-content" onClick={e => e.stopPropagation()} style={{ padding: '30px', borderRadius: '20px', maxWidth: '500px', width: '90%' }}>
+                            <div className="modal-header" style={{ marginBottom: '20px', borderBottom: '1px solid #eee', paddingBottom: '15px' }}>
+                                <h2 style={{ fontSize: '20px', margin: 0 }}>Dealer Details</h2>
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 15px', backgroundColor: '#f9fafb', borderRadius: '8px' }}>
+                                    <span style={{ color: '#6b7280', minWidth: '120px' }}>ID</span>
+                                    <span style={{ fontWeight: '600' }}>{selectedDealer.dealer_id}</span>
+                                </div>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 15px', backgroundColor: '#f9fafb', borderRadius: '8px' }}>
+                                    <span style={{ color: '#6b7280', minWidth: '120px' }}>Name</span>
+                                    <span style={{ fontWeight: '600' }}>{selectedDealer.dealer_name}</span>
+                                </div>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 15px', backgroundColor: '#f9fafb', borderRadius: '8px', gap: '20px' }}>
+                                    <span style={{ color: '#6b7280', minWidth: '120px', flexShrink: 0 }}>Email</span>
+                                    <span style={{ fontWeight: '600', textAlign: 'right', wordBreak: 'break-all' }}>{selectedDealer.email || 'N/A'}</span>
+                                </div>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 15px', backgroundColor: '#f9fafb', borderRadius: '8px' }}>
+                                    <span style={{ color: '#6b7280', minWidth: '120px' }}>Contact</span>
+                                    <span style={{ fontWeight: '600' }}>{selectedDealer.contact_number}</span>
+                                </div>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 15px', backgroundColor: '#f9fafb', borderRadius: '8px' }}>
+                                    <span style={{ color: '#6b7280', minWidth: '120px' }}>Alt. Contact</span>
+                                    <span style={{ fontWeight: '600' }}>{selectedDealer.alternative_contact || 'N/A'}</span>
+                                </div>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 15px', backgroundColor: '#f9fafb', borderRadius: '8px' }}>
+                                    <span style={{ color: '#6b7280', minWidth: '120px' }}>Route</span>
+                                    <span style={{ fontWeight: '600' }}>{selectedDealer.route || 'N/A'}</span>
+                                </div>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 15px', backgroundColor: '#f9fafb', borderRadius: '8px' }}>
+                                    <span style={{ color: '#6b7280', minWidth: '120px' }}>Credit Limit</span>
+                                    <span style={{ fontWeight: '600' }}>Rs. {Number(selectedDealer.credit_limit || 0).toLocaleString()}</span>
+                                </div>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 15px', backgroundColor: '#f9fafb', borderRadius: '8px' }}>
+                                    <span style={{ color: '#6b7280', minWidth: '120px' }}>Current Credit</span>
+                                    <span style={{ fontWeight: '600' }}>Rs. {Number(selectedDealer.current_credit || 0).toLocaleString()}</span>
+                                </div>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 15px', backgroundColor: '#f9fafb', borderRadius: '8px' }}>
+                                    <span style={{ color: '#6b7280', minWidth: '120px' }}>Available Credit</span>
+                                    <span style={{ fontWeight: '600' }}>Rs. {Number(selectedDealer.available_credit || 0).toLocaleString()}</span>
+                                </div>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 15px', backgroundColor: '#f9fafb', borderRadius: '8px' }}>
+                                    <span style={{ color: '#6b7280', minWidth: '120px' }}>Status</span>
+                                    <span className={`badge ${getStatusBadgeClass(selectedDealer.status)}`}>{selectedDealer.status}</span>
+                                </div>
+                            </div>
+                            <button onClick={() => setShowDetailsModal(false)} style={{ marginTop: '20px', width: '100%', padding: '12px', borderRadius: '10px', border: 'none', backgroundColor: '#101540', color: 'white', cursor: 'pointer' }}>
+                                Close
+                            </button>
+                        </div>
+                    </div>
+                )}
             </div>
         </>
     );

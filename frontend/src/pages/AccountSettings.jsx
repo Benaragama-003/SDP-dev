@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { authApi } from '../services/api';
 import { validatePassword, getPasswordErrors } from '../utils/passwordValidator';
@@ -12,13 +12,34 @@ const AccountSettings = () => {
 
     // Profile State
     const [profileData, setProfileData] = useState({
-        full_name: user?.full_name || '',
+        first_name: user?.first_name || '',
+        last_name: user?.last_name || '',
         email: user?.email || '',
         phone_number: user?.phone_number || '',
         username: user?.username || ''
     });
     const [profileLoading, setProfileLoading] = useState(false);
     const [profileMessage, setProfileMessage] = useState({ type: '', text: '' });
+
+    // Fetch profile data on mount
+    useEffect(() => {
+        const fetchProfile = async () => {
+            try {
+                const response = await authApi.getProfile();
+                const data = response.data.data;
+                setProfileData({
+                    first_name: data.first_name || '',
+                    last_name: data.last_name || '',
+                    email: data.email || '',
+                    phone_number: data.phone_number || '',
+                    username: data.username || ''
+                });
+            } catch (err) {
+                console.error('Failed to fetch profile:', err);
+            }
+        };
+        fetchProfile();
+    }, []);
 
     // Password State
     const [passwordData, setPasswordData] = useState({
@@ -127,12 +148,23 @@ const AccountSettings = () => {
                                     />
                                 </div>
                                 <div className="form-group">
-                                    <label>Full Name</label>
+                                    <label>First Name</label>
                                     <input
                                         type="text"
-                                        name="full_name"
+                                        name="first_name"
                                         className="form-input"
-                                        value={profileData.full_name}
+                                        value={profileData.first_name}
+                                        onChange={handleProfileChange}
+                                        required
+                                    />
+                                </div>
+                                <div className="form-group">
+                                    <label>Last Name</label>
+                                    <input
+                                        type="text"
+                                        name="last_name"
+                                        className="form-input"
+                                        value={profileData.last_name}
                                         onChange={handleProfileChange}
                                         required
                                     />

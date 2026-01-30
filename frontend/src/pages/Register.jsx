@@ -8,7 +8,8 @@ const Register = () => {
     const navigate = useNavigate();
     const { register } = useAuth();
     const [formData, setFormData] = useState({
-        name: '',
+        first_name: '',
+        last_name: '',
         username: '',
         email: '',
         phone_number: '',
@@ -40,8 +41,8 @@ const Register = () => {
         setError('');
 
         // Validation
-        if (!formData.name || !formData.email || !formData.password || !formData.confirmPassword) {
-            setError('All fields are required');
+        if (!formData.first_name || !formData.last_name || !formData.email || !formData.password || !formData.confirmPassword) {
+            setError('All required fields must be filled');
             return;
         }
 
@@ -62,7 +63,8 @@ const Register = () => {
 
         try {
             await register(
-                formData.name,
+                formData.first_name,
+                formData.last_name,
                 formData.username,
                 formData.email,
                 formData.password,
@@ -95,13 +97,26 @@ const Register = () => {
 
                     <form className="register-form" onSubmit={handleSubmit}>
                         <div className="form-group">
-                            <label className="form-label">Full Name*</label>
+                            <label className="form-label">First Name*</label>
                             <input
                                 type="text"
-                                name="name"
+                                name="first_name"
                                 className="form-input"
-                                placeholder="Enter your full name"
-                                value={formData.name}
+                                placeholder="Enter first name"
+                                value={formData.first_name}
+                                onChange={handleChange}
+                                required
+                            />
+                        </div>
+
+                        <div className="form-group">
+                            <label className="form-label">Last Name*</label>
+                            <input
+                                type="text"
+                                name="last_name"
+                                className="form-input"
+                                placeholder="Enter last name"
+                                value={formData.last_name}
                                 onChange={handleChange}
                                 required
                             />

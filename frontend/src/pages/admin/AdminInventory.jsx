@@ -5,6 +5,13 @@ import { Search, Plus, DollarSign, Edit2, Loader2, AlertTriangle } from 'lucide-
 import api from '../../services/api';
 import '../../styles/Inventory.css';
 
+const mockInventoryData = [
+    { cylinder_size: '5kg', filled: 50, empty: 15, damaged: 3, new_stock: 10 },
+    { cylinder_size: '12.5kg', filled: 35, empty: 20, damaged: 2, new_stock: 8 },
+   
+    { cylinder_size: '37.5kg', filled: 40, empty: 18, damaged: 1, new_stock: 6 },
+];
+
 const AdminInventory = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [inventoryData, setInventoryData] = useState([]);
@@ -22,6 +29,7 @@ const AdminInventory = () => {
             setInventoryData(response.data.data);
         } catch (err) {
             console.error("Failed to fetch inventory", err);
+            setInventoryData(mockInventoryData); 
         } finally {
             setLoading(false);
         }
