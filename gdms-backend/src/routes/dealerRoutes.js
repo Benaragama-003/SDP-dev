@@ -10,7 +10,9 @@ const {
   updateDealer,
   deleteDealer,
   toggleDealerStatus,
-  getDealerStats
+  getDealerStats,
+  exportDealersToExcel,
+  getUniqueRoutes
 } = require('../controllers/dealerController');
 
 const router = express.Router();
@@ -103,6 +105,12 @@ const updateDealerValidation = [
 
 // All routes require authentication
 router.use(authenticateToken);
+
+// export dealers to excel (with optional route filter)
+router.get('/export', exportDealersToExcel);
+
+// get unique routes for filter dropdown
+router.get('/routes', getUniqueRoutes);
 
 //get dealer stats
 router.get('/stats', getDealerStats);

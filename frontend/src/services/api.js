@@ -58,6 +58,14 @@ export const dealerApi = {
     // Get dealer statistics (for dashboard)
     getDealerStats: () => api.get('/dealers/stats'),
 
+    // Get unique routes for filter dropdown
+    getRoutes: () => api.get('/dealers/routes'),
+
+    // Export dealers to Excel (returns blob)
+    exportToExcel: (route = 'all') => api.get(`/dealers/export${route !== 'all' ? `?route=${route}` : ''}`, {
+        responseType: 'blob'
+    }),
+
     // Create new dealer
     createDealer: (dealerData) => api.post('/dealers', dealerData),
 

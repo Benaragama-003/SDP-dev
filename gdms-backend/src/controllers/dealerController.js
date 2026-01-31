@@ -1,6 +1,7 @@
 const { getConnection } = require('../config/database');
 const { generateId } = require('../utils/generateId');
 const { successResponse, errorResponse } = require('../utils/responseHelper');
+const ExcelJS = require('exceljs');
 
 
 // Fetch all dealers 
@@ -422,6 +423,160 @@ const getDealerStats = async (req, res, next) => {
   }
 };
 
+// ============================================
+// EXPORT DEALERS TO EXCEL
+// ============================================
+// Purpose: Export dealers data to Excel file with optional route filter
+// Route: GET /api/v1/dealers/export?route=Ratnapura
+const exportDealersToExcel = async (req, res, next) => {
+  try {
+    const pool = await getConnection();
+    const { route } = req.query;
+
+    // Build query with optional route filter
+    let query = `
+      SELECT 
+        dealer_id,
+        dealer_name,
+        contact_number,
+        alternative_contact,
+        email,
+        route,
+        address,
+        credit_limit,
+        current_credit,
+        (credit_limit - current_credit) as available_credit,
+        status,
+        created_at
+      FROM dealers 
+      WHERE 1=1
+    `;
+
+    const params = [];
+    if (route && route !== 'all') {
+      query += ` AND route = ?`;
+      params.push(route);
+    }
+
+    query += ' ORDER BY route, dealer_name';
+
+    const [dealers] = await pool.execute(query, params);
+
+    // Create Excel workbook
+    const workbook = new ExcelJS.Workbook();
+    workbook.creator = 'GDMS - Hidellana Distributors';
+    workbook.created = new Date();
+
+    const worksheet = workbook.addWorksheet('Dealers', {
+      headerFooter: {
+        firstHeader: 'Hidellana Distributors - Dealers Report'
+      }
+    });
+
+    // Define columns
+    worksheet.columns = [
+      { header: 'Dealer ID', key: 'dealer_id', width: 12 },
+      { header: 'Name', key: 'dealer_name', width: 25 },
+      { header: 'Contact', key: 'contact_number', width: 15 },
+      { header: 'Alt. Contact', key: 'alternative_contact', width: 15 },
+      { header: 'Email', key: 'email', width: 25 },
+      { header: 'Route', key: 'route', width: 15 },
+      { header: 'Address', key: 'address', width: 30 },
+      { header: 'Credit Limit', key: 'credit_limit', width: 15 },
+      { header: 'Current Credit', key: 'current_credit', width: 15 },
+      { header: 'Available Credit', key: 'available_credit', width: 15 },
+      { header: 'Status', key: 'status', width: 12 }
+    ];
+
+    // Style header row
+    worksheet.getRow(1).font = { bold: true, color: { argb: 'FFFFFF' } };
+    worksheet.getRow(1).fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: '4F46E5' }
+    };
+    worksheet.getRow(1).alignment = { vertical: 'middle', horizontal: 'center' };
+
+    // Add data rows
+    dealers.forEach(dealer => {
+      worksheet.addRow({
+        dealer_id: dealer.dealer_id,
+        dealer_name: dealer.dealer_name,
+        contact_number: dealer.contact_number,
+        alternative_contact: dealer.alternative_contact || '-',
+        email: dealer.email || '-',
+        route: dealer.route || '-',
+        address: dealer.address || '-',
+        credit_limit: Number(dealer.credit_limit || 0),
+        current_credit: Number(dealer.current_credit || 0),
+        available_credit: Number(dealer.available_credit || 0),
+        status: dealer.status
+      });
+    });
+
+    // Format currency columns
+    worksheet.getColumn('credit_limit').numFmt = '#,##0.00';
+    worksheet.getColumn('current_credit').numFmt = '#,##0.00';
+    worksheet.getColumn('available_credit').numFmt = '#,##0.00';
+
+    // Add borders to all cells
+    worksheet.eachRow((row, rowNumber) => {
+      row.eachCell((cell) => {
+        cell.border = {
+          top: { style: 'thin' },
+          left: { style: 'thin' },
+          bottom: { style: 'thin' },
+          right: { style: 'thin' }
+        };
+      });
+    });
+
+    // Set response headers for file download
+    const filename = route && route !== 'all' 
+      ? `dealers_${route.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.xlsx`
+      : `dealers_all_${new Date().toISOString().split('T')[0]}.xlsx`;
+
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition');
+
+    // Write to response
+    await workbook.xlsx.write(res);
+
+  } catch (error) {
+    console.error('Export error:', error);
+    // If headers haven't been sent, send error response
+    if (!res.headersSent) {
+      return res.status(500).json({ success: false, message: 'Failed to export dealers' });
+    }
+    next(error);
+  }
+};
+
+// ============================================
+// GET UNIQUE ROUTES
+// ============================================
+// Purpose: Get list of unique routes for filter dropdown
+// Route: GET /api/v1/dealers/routes
+const getUniqueRoutes = async (req, res, next) => {
+  try {
+    const pool = await getConnection();
+
+    const [routes] = await pool.execute(`
+      SELECT DISTINCT route 
+      FROM dealers 
+      WHERE route IS NOT NULL AND route != ''
+      ORDER BY route
+    `);
+
+    const routeList = routes.map(r => r.route);
+    return successResponse(res, 200, 'Routes retrieved successfully', routeList);
+
+  } catch (error) {
+    next(error);
+  }
+};
+
 // Export all functions
 module.exports = {
   getAllDealers,
@@ -430,5 +585,7 @@ module.exports = {
   updateDealer,
   deleteDealer,
   toggleDealerStatus,
-  getDealerStats
+  getDealerStats,
+  exportDealersToExcel,
+  getUniqueRoutes
 };

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import AdminSidebar from '../../components/AdminSidebar';
-import { Search, Plus, Edit2, Eye, ToggleLeft, ToggleRight } from 'lucide-react';
+import { Search, Plus, Edit2, Eye, ToggleLeft, ToggleRight, Download, ChevronDown } from 'lucide-react';
 import { dealerApi } from '../../services/api';
 import '../../styles/Dealers.css';
 
@@ -14,11 +14,50 @@ const AdminDealers = () => {
     const [toggling, setToggling] = useState(null);
     const [showDetailsModal, setShowDetailsModal] = useState(false);
     const [selectedDealer, setSelectedDealer] = useState(null);
+    const [routes, setRoutes] = useState([]);
+    const [showExportDropdown, setShowExportDropdown] = useState(false);
+    const [exporting, setExporting] = useState(false);
 
     // Fetch dealers from backend
     useEffect(() => {
         fetchDealers();
+        fetchRoutes();
     }, []);
+
+    const fetchRoutes = async () => {
+        try {
+            const response = await dealerApi.getRoutes();
+            setRoutes(response.data.data || []);
+        } catch (err) {
+            console.error('Error fetching routes:', err);
+        }
+    };
+
+    const handleExport = async (route = 'all') => {
+        try {
+            setExporting(true);
+            setShowExportDropdown(false);
+            const response = await dealerApi.exportToExcel(route);
+            
+            // response.data is already a blob when responseType is 'blob'
+            const url = window.URL.createObjectURL(response.data);
+            const link = document.createElement('a');
+            link.href = url;
+            const filename = route !== 'all' 
+                ? `dealers_${route.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.xlsx`
+                : `dealers_all_${new Date().toISOString().split('T')[0]}.xlsx`;
+            link.setAttribute('download', filename);
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            window.URL.revokeObjectURL(url);
+        } catch (err) {
+            console.error('Error exporting:', err);
+            alert('Failed to export dealers');
+        } finally {
+            setExporting(false);
+        }
+    };
 
     const fetchDealers = async () => {
         try {
@@ -86,10 +125,58 @@ const AdminDealers = () => {
                             <h1 className="page-title">Dealers Management</h1>
                             <p className="page-subtitle">Manage dealer network</p>
                         </div>
-                        <button className="btn btn-primary" onClick={() => navigate('/admin/dealers/add')}>
-                            <Plus size={20} />
-                            Add New Dealer
-                        </button>
+                        <div style={{ display: 'flex', gap: '10px' }}>
+                            <div style={{ position: 'relative' }}>
+                                <button 
+                                    className="btn btn-secondary" 
+                                    onClick={() => setShowExportDropdown(!showExportDropdown)}
+                                    disabled={exporting}
+                                    style={{ display: 'flex', alignItems: 'center', gap: '8px', backgroundColor: '#10b981', color: 'white', border: 'none' }}
+                                >
+                                    <Download size={20} />
+                                    {exporting ? 'Exporting...' : 'Export Excel'}
+                                    <ChevronDown size={16} />
+                                </button>
+                                {showExportDropdown && (
+                                    <div style={{ 
+                                        position: 'absolute', 
+                                        top: '100%', 
+                                        right: 0, 
+                                        marginTop: '5px',
+                                        backgroundColor: 'white', 
+                                        border: '1px solid #ddd', 
+                                        borderRadius: '8px', 
+                                        boxShadow: '0 4px 12px rgba(0,0,0,0.15)', 
+                                        zIndex: 100,
+                                        minWidth: '180px'
+                                    }}>
+                                        <div 
+                                            onClick={() => handleExport('all')} 
+                                            style={{ padding: '10px 15px', cursor: 'pointer', borderBottom: '1px solid #eee', fontWeight: '600' }}
+                                            onMouseOver={(e) => e.target.style.backgroundColor = '#f5f5f5'}
+                                            onMouseOut={(e) => e.target.style.backgroundColor = 'white'}
+                                        >
+                                            All Routes
+                                        </div>
+                                        {routes.map(route => (
+                                            <div 
+                                                key={route} 
+                                                onClick={() => handleExport(route)} 
+                                                style={{ padding: '10px 15px', cursor: 'pointer', borderBottom: '1px solid #eee' }}
+                                                onMouseOver={(e) => e.target.style.backgroundColor = '#f5f5f5'}
+                                                onMouseOut={(e) => e.target.style.backgroundColor = 'white'}
+                                            >
+                                                {route}
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                            <button className="btn btn-primary" onClick={() => navigate('/admin/dealers/add')}>
+                                <Plus size={20} />
+                                Add New Dealer
+                            </button>
+                        </div>
                     </div>
 
                     <div className="table-container">
