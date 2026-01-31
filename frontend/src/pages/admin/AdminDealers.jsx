@@ -125,7 +125,12 @@ const AdminDealers = () => {
                             <h1 className="page-title">Dealers Management</h1>
                             <p className="page-subtitle">Manage dealer network</p>
                         </div>
+                        
                         <div style={{ display: 'flex', gap: '10px' }}>
+                            <button className="btn btn-primary" onClick={() => navigate('/admin/dealers/add')}>
+                             <Plus size={20} />
+                             Add New Dealer
+                            </button>
                             <div style={{ position: 'relative' }}>
                                 <button 
                                     className="btn btn-secondary" 
@@ -172,10 +177,7 @@ const AdminDealers = () => {
                                     </div>
                                 )}
                             </div>
-                            <button className="btn btn-primary" onClick={() => navigate('/admin/dealers/add')}>
-                                <Plus size={20} />
-                                Add New Dealer
-                            </button>
+                   
                         </div>
                     </div>
 

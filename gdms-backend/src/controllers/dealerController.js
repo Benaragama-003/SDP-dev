@@ -423,11 +423,8 @@ const getDealerStats = async (req, res, next) => {
   }
 };
 
-// ============================================
-// EXPORT DEALERS TO EXCEL
-// ============================================
-// Purpose: Export dealers data to Excel file with optional route filter
-// Route: GET /api/v1/dealers/export?route=Ratnapura
+//Export dealers data to Excel file with optional route filter
+
 const exportDealersToExcel = async (req, res, next) => {
   try {
     const pool = await getConnection();
@@ -467,69 +464,94 @@ const exportDealersToExcel = async (req, res, next) => {
     workbook.creator = 'GDMS - Hidellana Distributors';
     workbook.created = new Date();
 
-    const worksheet = workbook.addWorksheet('Dealers', {
-      headerFooter: {
-        firstHeader: 'Hidellana Distributors - Dealers Report'
-      }
-    });
+    const worksheet = workbook.addWorksheet('Dealers');
 
-    // Define columns
-    worksheet.columns = [
-      { header: 'Dealer ID', key: 'dealer_id', width: 12 },
-      { header: 'Name', key: 'dealer_name', width: 25 },
-      { header: 'Contact', key: 'contact_number', width: 15 },
-      { header: 'Alt. Contact', key: 'alternative_contact', width: 15 },
-      { header: 'Email', key: 'email', width: 25 },
-      { header: 'Route', key: 'route', width: 15 },
-      { header: 'Address', key: 'address', width: 30 },
-      { header: 'Credit Limit', key: 'credit_limit', width: 15 },
-      { header: 'Current Credit', key: 'current_credit', width: 15 },
-      { header: 'Available Credit', key: 'available_credit', width: 15 },
-      { header: 'Status', key: 'status', width: 12 }
-    ];
+    // ============ COMPANY HEADER (Rows 1-4) ============
+    worksheet.mergeCells('A1:K1');
+    worksheet.getCell('A1').value = 'HIDELLANA DISTRIBUTORS (PVT) LTD';
+    worksheet.getCell('A1').font = { bold: true, size: 16 };
+    worksheet.getCell('A1').alignment = { horizontal: 'center' };
 
-    // Style header row
-    worksheet.getRow(1).font = { bold: true, color: { argb: 'FFFFFF' } };
-    worksheet.getRow(1).fill = {
-      type: 'pattern',
-      pattern: 'solid',
-      fgColor: { argb: '4F46E5' }
-    };
-    worksheet.getRow(1).alignment = { vertical: 'middle', horizontal: 'center' };
+    worksheet.mergeCells('A2:K2');
+    worksheet.getCell('A2').value = 'Company Registration No PV 113085';
+    worksheet.getCell('A2').font = { size: 11 };
+    worksheet.getCell('A2').alignment = { horizontal: 'center' };
 
-    // Add data rows
+    worksheet.mergeCells('A3:K3');
+    worksheet.getCell('A3').value = 'Registered Office Address: No.343/10, Rajasinghe Mawatha, Hewagama, Kaduwela.';
+    worksheet.getCell('A3').font = { size: 10 };
+    worksheet.getCell('A3').alignment = { horizontal: 'center' };
+
+    worksheet.mergeCells('A4:K4');
+    worksheet.getCell('A4').value = 'Warehouse: Kahangama Road, Edandawala, Kuruwita.';
+    worksheet.getCell('A4').font = { size: 10 };
+    worksheet.getCell('A4').alignment = { horizontal: 'center' };
+
+    // ============ SET COLUMN WIDTHS ============
+    worksheet.getColumn('A').width = 12;  // Dealer ID
+    worksheet.getColumn('B').width = 25;  // Name
+    worksheet.getColumn('C').width = 15;  // Contact
+    worksheet.getColumn('D').width = 15;  // Alt Contact
+    worksheet.getColumn('E').width = 25;  // Email
+    worksheet.getColumn('F').width = 15;  // Route
+    worksheet.getColumn('G').width = 30;  // Address
+    worksheet.getColumn('H').width = 15;  // Credit Limit
+    worksheet.getColumn('I').width = 15;  // Current Credit
+    worksheet.getColumn('J').width = 15;  // Available Credit
+    worksheet.getColumn('K').width = 12;  // Status
+
+    // ============ TABLE HEADER (Row 6) ============
+    const headerRow = worksheet.getRow(6);
+    headerRow.values = ['Dealer ID', 'Name', 'Contact', 'Alt. Contact', 'Email', 'Route', 'Address', 'Credit Limit', 'Current Credit', 'Available Credit', 'Status'];
+    
+    // Style table header (row 6, columns A-K only)
+    for (let col = 1; col <= 11; col++) {
+      const cell = headerRow.getCell(col);
+      cell.font = { bold: true, color: { argb: 'FFFFFF' } };
+      cell.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: '4F46E5' }
+      };
+      cell.alignment = { vertical: 'middle', horizontal: 'center' };
+    }
+
+    // ============ DATA ROWS (Starting Row 7) ============
+    let rowNumber = 7;
     dealers.forEach(dealer => {
-      worksheet.addRow({
-        dealer_id: dealer.dealer_id,
-        dealer_name: dealer.dealer_name,
-        contact_number: dealer.contact_number,
-        alternative_contact: dealer.alternative_contact || '-',
-        email: dealer.email || '-',
-        route: dealer.route || '-',
-        address: dealer.address || '-',
-        credit_limit: Number(dealer.credit_limit || 0),
-        current_credit: Number(dealer.current_credit || 0),
-        available_credit: Number(dealer.available_credit || 0),
-        status: dealer.status
-      });
+      const row = worksheet.getRow(rowNumber);
+      row.values = [
+        dealer.dealer_id,
+        dealer.dealer_name,
+        dealer.contact_number,
+        dealer.alternative_contact || '-',
+        dealer.email || '-',
+        dealer.route || '-',
+        dealer.address || '-',
+        Number(dealer.credit_limit || 0),
+        Number(dealer.current_credit || 0),
+        Number(dealer.available_credit || 0),
+        dealer.status
+      ];
+      rowNumber++;
     });
 
-    // Format currency columns
-    worksheet.getColumn('credit_limit').numFmt = '#,##0.00';
-    worksheet.getColumn('current_credit').numFmt = '#,##0.00';
-    worksheet.getColumn('available_credit').numFmt = '#,##0.00';
+    // ============ FORMAT CURRENCY COLUMNS ============
+    worksheet.getColumn('H').numFmt = '#,##0.00';
+    worksheet.getColumn('I').numFmt = '#,##0.00';
+    worksheet.getColumn('J').numFmt = '#,##0.00';
 
-    // Add borders to all cells
-    worksheet.eachRow((row, rowNumber) => {
-      row.eachCell((cell) => {
-        cell.border = {
+    // ============ ADD BORDERS (Only to table area: Row 6 to last row, Columns A-K) ============
+    for (let r = 6; r < rowNumber; r++) {
+      for (let c = 1; c <= 11; c++) {
+        worksheet.getRow(r).getCell(c).border = {
           top: { style: 'thin' },
           left: { style: 'thin' },
           bottom: { style: 'thin' },
           right: { style: 'thin' }
         };
-      });
-    });
+      }
+    }
 
     // Set response headers for file download
     const filename = route && route !== 'all' 

@@ -111,6 +111,10 @@ const Dealers = () => {
                             <p className="page-subtitle">Manage your dealer network</p>
                         </div>
                         <div style={{ display: 'flex', gap: '10px' }}>
+                            <button className="btn btn-primary" onClick={() => navigate('/dealers/add')}>
+                                <Plus size={20} />
+                                Add New Dealer
+                            </button>
                             <div style={{ position: 'relative' }}>
                                 <button 
                                     className="btn btn-secondary" 
@@ -157,10 +161,7 @@ const Dealers = () => {
                                     </div>
                                 )}
                             </div>
-                            <button className="btn btn-primary" onClick={() => navigate('/dealers/add')}>
-                                <Plus size={20} />
-                                Add New Dealer
-                            </button>
+
                         </div>
                     </div>
 
