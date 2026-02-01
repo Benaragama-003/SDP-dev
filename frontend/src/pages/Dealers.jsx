@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Sidebar from '../components/Sidebar';
 import { Search, Plus, Edit2, Eye, Download, ChevronDown } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -17,24 +17,25 @@ const Dealers = () => {
     const [showExportDropdown, setShowExportDropdown] = useState(false);
     const [exporting, setExporting] = useState(false);
 
-    // Fetch dealers from backend
-  useEffect(() => {
+const fetchDealers = useCallback(async () => {
+    try {
+        setLoading(true);
+        setError(null);
+        const response = await dealerApi.getAllDealers(searchTerm);
+        setDealers(response.data.data || []);
+    } catch (err) {
+        console.error('Error fetching dealers:', err);
+        setError(err.response?.data?.message || 'Failed to fetch dealers');
+    } finally {
+        setLoading(false);
+    }
+}, [searchTerm]);
+
+// Fetch dealers from backend
+useEffect(() => {
     fetchDealers();
     fetchRoutes();  
-}, []);
-    const fetchDealers = async () => {
-        try {
-            setLoading(true);
-            setError(null);
-            const response = await dealerApi.getAllDealers(searchTerm);
-            setDealers(response.data.data || []);
-        } catch (err) {
-            console.error('Error fetching dealers:', err);
-            setError(err.response?.data?.message || 'Failed to fetch dealers');
-        } finally {
-            setLoading(false);
-        }
-    };
+}, [fetchDealers]);
 
     const fetchRoutes = async () => {
     try {
@@ -80,7 +81,7 @@ const Dealers = () => {
         }, 500);
 
         return () => clearTimeout(delaySearch);
-    }, [searchTerm]);
+    }, [searchTerm, fetchDealers]);
 
     const getStatusBadgeClass = (status) => {
         switch (status?.toUpperCase()) {
