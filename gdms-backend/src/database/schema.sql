@@ -192,7 +192,6 @@ CREATE TABLE inventory (
     product_id VARCHAR(20) NOT NULL,
     product_type ENUM('FILLED', 'EMPTY', 'DAMAGED') NOT NULL COMMENT 'State of cylinders in warehouse',
     quantity INT NOT NULL DEFAULT 0,
-    min_stock_level INT NOT NULL DEFAULT 0,
     reorder_level INT DEFAULT 100,
     last_updated DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     managed_by VARCHAR(20),
@@ -204,6 +203,32 @@ CREATE TABLE inventory (
     INDEX idx_type (product_type)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Inventory Movements Table (Audit trail for all inventory changes)
+CREATE TABLE inventory_movements (
+    movement_id VARCHAR(20) PRIMARY KEY,
+    product_id VARCHAR(20) NOT NULL,
+    product_type ENUM('FILLED', 'EMPTY', 'DAMAGED') NOT NULL,
+    movement_type ENUM(
+        'Initial Stock',
+        'PURCHASE_RECEIVED',
+        'DISPATCH_LOADED',
+        'DISPATCH_RETURNED',
+        'DAMAGE_REPORTED',
+        'ADJUSTMENT'
+    ) NOT NULL,
+    quantity_change INT NOT NULL COMMENT 'Positive for IN, Negative for OUT',
+    quantity_before INT NOT NULL,
+    quantity_after INT NOT NULL,
+    reference_id VARCHAR(20) COMMENT 'dispatch_id, order_id, or damage_id based on movement_type',
+    created_by VARCHAR(20) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (product_id) REFERENCES products(product_id),
+    FOREIGN KEY (created_by) REFERENCES users(user_id),
+    INDEX idx_product (product_id),
+    INDEX idx_type (movement_type),
+    INDEX idx_date (created_at),
+    INDEX idx_reference (reference_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Damage Inventory Table (Detailed damage incident tracking)
 CREATE TABLE damage_inventory (

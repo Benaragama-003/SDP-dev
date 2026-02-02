@@ -131,7 +131,13 @@ const SupervisorManagement = () => {
                                 </tr>
                             </thead>
                     <tbody>
-                        {filtered.length === 0 ? (
+                        {loading ? (
+                            <tr>
+                                <td colSpan="6" style={{ textAlign: 'center', padding: '40px' }}>
+                                    Loading supervisors...
+                                </td>
+                            </tr>
+                        ) : filtered.length === 0 ? (
                             <tr>
                                 <td colSpan="6" style={{ textAlign: 'center', padding: '40px' }}>
                                     No supervisor accounts found

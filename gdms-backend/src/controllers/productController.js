@@ -1,21 +1,44 @@
 const { getConnection } = require('../config/database');
 const { successResponse, errorResponse } = require('../utils/responseHelper');
+const ExcelJS = require('exceljs');
 
+// Helper: Record inventory movement (audit trail)
+const recordInventoryMovement = async (connection, {
+    product_id,
+    product_type,
+    movement_type,
+    quantity_change,
+    quantity_before,
+    quantity_after,
+    reference_id,
+    created_by
+}) => {
+    const movement_id = `MV${Date.now()}${Math.random().toString(36).substr(2, 4)}`;
+    await connection.execute(
+        `INSERT INTO inventory_movements 
+         (movement_id, product_id, product_type, movement_type, quantity_change, quantity_before, quantity_after, reference_id, created_by)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [movement_id, product_id, product_type, movement_type, quantity_change, quantity_before, quantity_after, reference_id, created_by]
+    );
+    return movement_id;
+};
 
 // Inventory summary grouped by size
 const getInventorySummary = async (req, res, next) => {
     try {
         const pool = await getConnection();
+        // Show ALL products in inventory (including DISCONTINUED) so we can track existing stock
         const [rows] = await pool.execute(`
             SELECT 
+                p.product_id,
                 p.cylinder_size,
+                p.status,
                 MAX(CASE WHEN i.product_type = 'FILLED' THEN i.quantity ELSE 0 END) as filled,
-                MAX(CASE WHEN i.product_type = 'EMPTY' THEN i.quantity ELSE 0 END) as empty,
+                MAX(CASE WHEN i.product_type = 'EMPTY' THEN i.quantity ELSE 0 END) as \`empty\`,
                 MAX(CASE WHEN i.product_type = 'DAMAGED' THEN i.quantity ELSE 0 END) as damaged
             FROM products p
             LEFT JOIN inventory i ON p.product_id = i.product_id
-            WHERE p.status = 'ACTIVE'
-            GROUP BY p.product_id, p.cylinder_size
+            GROUP BY p.product_id, p.cylinder_size, p.status
             ORDER BY CAST(REGEXP_REPLACE(p.cylinder_size, '[^0-9.]', '') AS DECIMAL(10,2))
         `);
         return successResponse(res, 200, 'Inventory summary retrieved', rows);
@@ -24,14 +47,28 @@ const getInventorySummary = async (req, res, next) => {
     }
 };
 
-// Get all standardized products
+// Get all standardized products (includes DISCONTINUED for viewing/reactivating)
 const getAllProducts = async (req, res, next) => {
+    try {
+        const pool = await getConnection();
+        // Show ALL products so admin can view and reactivate discontinued ones
+        const [products] = await pool.execute(
+            'SELECT * FROM products ORDER BY cylinder_size'
+        );
+        return successResponse(res, 200, 'Products retrieved successfully', products);
+    } catch (error) {
+        next(error);
+    }
+};
+
+// Get only ACTIVE products (for dropdowns in Dispatch, Purchase Orders)
+const getActiveProducts = async (req, res, next) => {
     try {
         const pool = await getConnection();
         const [products] = await pool.execute(
             'SELECT * FROM products WHERE status = "ACTIVE" ORDER BY cylinder_size'
         );
-        return successResponse(res, 200, 'Products retrieved successfully', products);
+        return successResponse(res, 200, 'Active products retrieved successfully', products);
     } catch (error) {
         next(error);
     }
@@ -44,10 +81,7 @@ const createProduct = async (req, res, next) => {
         filled_purchase_price,
         new_purchase_price,
         filled_selling_price,
-        new_selling_price,
-        cylinder_deposit,
-        description,
-        initial_quantity
+        new_selling_price
     } = req.body;
 
     try {
@@ -61,9 +95,17 @@ const createProduct = async (req, res, next) => {
             const product_code = `CYL-${sizeNum}KG`; // e.g., CYL-5KG, CYL-12KG
 
             await connection.execute(
-                `INSERT INTO products (product_id, product_code, cylinder_size, filled_purchase_price, new_purchase_price, filled_selling_price, new_selling_price, cylinder_deposit, description)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-                [product_id, product_code, cylinder_size, filled_purchase_price || 0, new_purchase_price || 0, filled_selling_price || 0, new_selling_price || 0, cylinder_deposit || 0, description]
+                `INSERT INTO products (product_id, product_code, cylinder_size, filled_purchase_price, new_purchase_price, filled_selling_price, new_selling_price)
+                 VALUES (?, ?, ?, ?, ?, ?, ?)`,
+                [
+                    product_id, 
+                    product_code, 
+                    cylinder_size, 
+                    parseFloat(filled_purchase_price) || 0, 
+                    parseFloat(new_purchase_price) || 0, 
+                    parseFloat(filled_selling_price) || 0, 
+                    parseFloat(new_selling_price) || 0
+                ]
             );
 
             // Initialize inventory for the 3 main types (FILLED, EMPTY, DAMAGED) 
@@ -72,7 +114,7 @@ const createProduct = async (req, res, next) => {
                 await connection.execute(
                     `INSERT INTO inventory (inventory_id, product_id, product_type, quantity, managed_by)
                      VALUES (?, ?, ?, ?, ?)`,
-                    [`INV${Date.now()}${type[0]}`, product_id, type, type === 'FILLED' ? (initial_quantity || 0) : 0, req.user.userId]
+                    [`INV${Date.now()}${type[0]}`, product_id, type, 0, req.user.userId]
                 );
             }
 
@@ -89,8 +131,447 @@ const createProduct = async (req, res, next) => {
     }
 };
 
+// Update product prices
+const updateProduct = async (req, res, next) => {
+    const { id } = req.params;
+    const {
+        filled_purchase_price,
+        new_purchase_price,
+        filled_selling_price,
+        new_selling_price,
+    } = req.body;
+
+    try {
+        const pool = await getConnection();
+        
+        // Check product exists
+        const [existing] = await pool.execute(
+            'SELECT * FROM products WHERE product_id = ?',
+            [id]
+        );
+        
+        if (existing.length === 0) {
+            return errorResponse(res, 404, 'Product not found');
+        }
+
+        await pool.execute(
+            `UPDATE products SET 
+                filled_purchase_price = COALESCE(?, filled_purchase_price),
+                new_purchase_price = COALESCE(?, new_purchase_price),
+                filled_selling_price = COALESCE(?, filled_selling_price),
+                new_selling_price = COALESCE(?, new_selling_price)
+             WHERE product_id = ?`,
+            [filled_purchase_price, new_purchase_price, filled_selling_price, new_selling_price, id]
+        );
+
+        return successResponse(res, 200, 'Product updated successfully');
+    } catch (error) {
+        next(error);
+    }
+};
+
+// Toggle product status (ACTIVE/INACTIVE)
+const toggleProductStatus = async (req, res, next) => {
+    const { id } = req.params;
+
+    try {
+        const pool = await getConnection();
+        
+        // Get current status
+        const [existing] = await pool.execute(
+            'SELECT status FROM products WHERE product_id = ?',
+            [id]
+        );
+        
+        if (existing.length === 0) {
+            return errorResponse(res, 404, 'Product not found');
+        }
+
+        const newStatus = existing[0].status === 'ACTIVE' ? 'DISCONTINUED' : 'ACTIVE';
+
+        await pool.execute(
+            'UPDATE products SET status = ? WHERE product_id = ?',
+            [newStatus, id]
+        );
+
+        return successResponse(res, 200, `Product ${newStatus === 'ACTIVE' ? 'activated' : 'deactivated'} successfully`, { status: newStatus });
+    } catch (error) {
+        next(error);
+    }
+};
+
+// Report damage (Admin - warehouse damage from FILLED stock)
+const reportDamage = async (req, res, next) => {
+    const { product_id, quantity_damaged, damage_reason } = req.body;
+
+    if (!product_id || !quantity_damaged || !damage_reason) {
+        return errorResponse(res, 400, 'Product ID, quantity, and damage reason are required');
+    }
+
+    try {
+        const pool = await getConnection();
+        const connection = await pool.getConnection();
+        await connection.beginTransaction();
+
+        try {
+            // Get current FILLED and DAMAGED quantities
+            const [filledInv] = await connection.execute(
+                'SELECT quantity FROM inventory WHERE product_id = ? AND product_type = ?',
+                [product_id, 'FILLED']
+            );
+            const [damagedInv] = await connection.execute(
+                'SELECT quantity FROM inventory WHERE product_id = ? AND product_type = ?',
+                [product_id, 'DAMAGED']
+            );
+
+            if (filledInv.length === 0) {
+                await connection.rollback();
+                return errorResponse(res, 404, 'Product inventory not found');
+            }
+
+            const filledBefore = filledInv[0].quantity;
+            const damagedBefore = damagedInv[0]?.quantity || 0;
+
+            if (filledBefore < quantity_damaged) {
+                await connection.rollback();
+                return errorResponse(res, 400, 'Insufficient filled stock to report damage');
+            }
+
+            // Create damage record
+            const damage_id = `DMG${Date.now()}`;
+            await connection.execute(
+                `INSERT INTO damage_inventory (damage_id, product_id, quantity_damaged, damage_reason, reported_by)
+                 VALUES (?, ?, ?, ?, ?)`,
+                [damage_id, product_id, quantity_damaged, damage_reason, req.user.userId]
+            );
+
+            // Update FILLED inventory (-quantity)
+            await connection.execute(
+                'UPDATE inventory SET quantity = quantity - ? WHERE product_id = ? AND product_type = ?',
+                [quantity_damaged, product_id, 'FILLED']
+            );
+
+            // Update DAMAGED inventory (+quantity)
+            await connection.execute(
+                'UPDATE inventory SET quantity = quantity + ? WHERE product_id = ? AND product_type = ?',
+                [quantity_damaged, product_id, 'DAMAGED']
+            );
+
+            // Record movement for FILLED (deduct)
+            await recordInventoryMovement(connection, {
+                product_id,
+                product_type: 'FILLED',
+                movement_type: 'DAMAGE_REPORTED',
+                quantity_change: -quantity_damaged,
+                quantity_before: filledBefore,
+                quantity_after: filledBefore - quantity_damaged,
+                reference_id: damage_id,
+                created_by: req.user.userId
+            });
+
+            // Record movement for DAMAGED (add)
+            await recordInventoryMovement(connection, {
+                product_id,
+                product_type: 'DAMAGED',
+                movement_type: 'DAMAGE_REPORTED',
+                quantity_change: quantity_damaged,
+                quantity_before: damagedBefore,
+                quantity_after: damagedBefore + quantity_damaged,
+                reference_id: damage_id,
+                created_by: req.user.userId
+            });
+
+            await connection.commit();
+            return successResponse(res, 201, 'Damage reported successfully', { damage_id });
+        } catch (error) {
+            await connection.rollback();
+            throw error;
+        } finally {
+            connection.release();
+        }
+    } catch (error) {
+        next(error);
+    }
+};
+
+// Get inventory movements (for history/export)
+const getInventoryMovements = async (req, res, next) => {
+    const { product_id, movement_type, start_date, end_date } = req.query;
+
+    try {
+        const pool = await getConnection();
+        
+        let query = `
+            SELECT 
+                im.movement_id,
+                im.product_id,
+                p.cylinder_size,
+                im.product_type,
+                im.movement_type,
+                im.quantity_change,
+                im.quantity_before,
+                im.quantity_after,
+                im.reference_id,
+                im.created_by,
+                CONCAT(u.first_name, ' ', u.last_name) as created_by_name,
+                im.created_at
+            FROM inventory_movements im
+            JOIN products p ON im.product_id = p.product_id
+            LEFT JOIN users u ON im.created_by = u.user_id
+            WHERE 1=1
+        `;
+        const params = [];
+
+        if (product_id) {
+            query += ' AND im.product_id = ?';
+            params.push(product_id);
+        }
+        if (movement_type) {
+            query += ' AND im.movement_type = ?';
+            params.push(movement_type);
+        }
+        if (start_date) {
+            query += ' AND DATE(im.created_at) >= ?';
+            params.push(start_date);
+        }
+        if (end_date) {
+            query += ' AND DATE(im.created_at) <= ?';
+            params.push(end_date);
+        }
+
+        query += ' ORDER BY im.created_at DESC';
+
+        const [movements] = await pool.execute(query, params);
+        return successResponse(res, 200, 'Inventory movements retrieved', movements);
+    } catch (error) {
+        next(error);
+    }
+};
+
+// Export inventory with movement history to Excel
+const exportInventoryToExcel = async (req, res, next) => {
+    const { start_date, end_date } = req.query;
+
+    try {
+        const pool = await getConnection();
+
+        // Get current inventory summary
+        const [inventory] = await pool.execute(`
+            SELECT 
+                p.product_id,
+                p.cylinder_size,
+                p.product_code,
+                MAX(CASE WHEN i.product_type = 'FILLED' THEN i.quantity ELSE 0 END) as filled,
+                MAX(CASE WHEN i.product_type = 'EMPTY' THEN i.quantity ELSE 0 END) as \`empty\`,
+                MAX(CASE WHEN i.product_type = 'DAMAGED' THEN i.quantity ELSE 0 END) as damaged
+            FROM products p
+            LEFT JOIN inventory i ON p.product_id = i.product_id
+            WHERE p.status = 'ACTIVE'
+            GROUP BY p.product_id, p.cylinder_size, p.product_code
+            ORDER BY CAST(REGEXP_REPLACE(p.cylinder_size, '[^0-9.]', '') AS DECIMAL(10,2))
+        `);
+
+        // Get movement history grouped by product and type, ordered by date ASC (oldest first)
+        let movementQuery = `
+            SELECT 
+                im.created_at,
+                p.cylinder_size,
+                p.product_code,
+                im.product_type,
+                im.movement_type,
+                im.quantity_change,
+                im.quantity_before,
+                im.quantity_after,
+                im.reference_id,
+                CONCAT(u.first_name, ' ', u.last_name) as created_by_name
+            FROM inventory_movements im
+            JOIN products p ON im.product_id = p.product_id
+            LEFT JOIN users u ON im.created_by = u.user_id
+            WHERE 1=1
+        `;
+        const params = [];
+
+        if (start_date) {
+            movementQuery += ' AND DATE(im.created_at) >= ?';
+            params.push(start_date);
+        }
+        if (end_date) {
+            movementQuery += ' AND DATE(im.created_at) <= ?';
+            params.push(end_date);
+        }
+
+        // Order by cylinder size (numeric), then product_type, then date ASC
+        movementQuery += ` ORDER BY 
+            CAST(REGEXP_REPLACE(p.cylinder_size, '[^0-9.]', '') AS DECIMAL(10,2)),
+            im.product_type,
+            im.created_at ASC`;
+        const [movements] = await pool.execute(movementQuery, params);
+
+        // Create workbook
+        const workbook = new ExcelJS.Workbook();
+
+        // ===== SHEET 1: Current Inventory =====
+        const invSheet = workbook.addWorksheet('Current Inventory');
+
+        // Company Header
+        const companyHeaders = [
+            'HIDELLANA DISTRIBUTORS (PVT) LTD',
+            'No. 164, Kudagama Road, Hidellana, Ratnapura',
+            'Tel: 045-2222865 | Reg No: PV 113085',
+            `Inventory Report - Generated: ${new Date().toLocaleDateString()}`
+        ];
+
+        companyHeaders.forEach((text, idx) => {
+            invSheet.mergeCells(`A${idx + 1}:F${idx + 1}`);
+            const row = invSheet.getRow(idx + 1);
+            row.getCell(1).value = text;
+            row.getCell(1).alignment = { horizontal: 'center' };
+            row.getCell(1).font = idx === 0 ? { bold: true, size: 14 } : { size: 11 };
+        });
+
+        // Table headers at row 6
+        invSheet.getRow(6).values = ['Cylinder Size', 'Product Code', 'Filled', 'Empty', 'Damaged', 'Total'];
+        invSheet.getRow(6).eachCell(cell => {
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF6B21A8' } };
+            cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+            cell.alignment = { horizontal: 'center' };
+        });
+
+        // Data rows
+        inventory.forEach((item, idx) => {
+            const row = invSheet.getRow(7 + idx);
+            row.values = [
+                item.cylinder_size,
+                item.product_code,
+                item.filled,
+                item.empty,
+                item.damaged,
+                item.filled + item.empty + item.damaged
+            ];
+            row.eachCell(cell => {
+                cell.border = {
+                    top: { style: 'thin' },
+                    bottom: { style: 'thin' },
+                    left: { style: 'thin' },
+                    right: { style: 'thin' }
+                };
+            });
+        });
+
+        invSheet.columns = [
+            { width: 15 }, { width: 15 }, { width: 12 }, { width: 12 }, { width: 12 }, { width: 12 }
+        ];
+
+        // ===== SHEET 2: Stock Movements (Grouped by Product & Type) =====
+        const movSheet = workbook.addWorksheet('Stock Movements');
+
+        // Company Header
+        companyHeaders.forEach((text, idx) => {
+            movSheet.mergeCells(`A${idx + 1}:E${idx + 1}`);
+            const row = movSheet.getRow(idx + 1);
+            row.getCell(1).value = text;
+            row.getCell(1).alignment = { horizontal: 'center' };
+            row.getCell(1).font = idx === 0 ? { bold: true, size: 14 } : { size: 11 };
+        });
+
+        // Group movements by cylinder_size and product_type
+        const groupedMovements = {};
+        movements.forEach(mov => {
+            const key = `${mov.cylinder_size}|${mov.product_type}`;
+            if (!groupedMovements[key]) {
+                groupedMovements[key] = {
+                    cylinder_size: mov.cylinder_size,
+                    product_code: mov.product_code,
+                    product_type: mov.product_type,
+                    movements: []
+                };
+            }
+            groupedMovements[key].movements.push(mov);
+        });
+
+        let currentRow = 6;
+
+        // Iterate through each product group
+        Object.values(groupedMovements).forEach(group => {
+            // Product header row
+            const headerRow = movSheet.getRow(currentRow);
+            movSheet.mergeCells(`A${currentRow}:E${currentRow}`);
+            headerRow.getCell(1).value = `${group.cylinder_size} (${group.product_code}) - ${group.product_type}`;
+            headerRow.getCell(1).font = { bold: true, size: 12 };
+            headerRow.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E3A5F' } };
+            headerRow.getCell(1).font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 12 };
+            currentRow++;
+
+            // Column headers for this group
+            const colHeaderRow = movSheet.getRow(currentRow);
+            colHeaderRow.values = ['Date', 'Movement Type', 'Change', 'Balance', 'Reference'];
+            colHeaderRow.eachCell(cell => {
+                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF6B21A8' } };
+                cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+                cell.alignment = { horizontal: 'center' };
+                cell.border = {
+                    top: { style: 'thin' },
+                    bottom: { style: 'thin' },
+                    left: { style: 'thin' },
+                    right: { style: 'thin' }
+                };
+            });
+            currentRow++;
+
+            // Movement rows for this group
+            group.movements.forEach(mov => {
+                const row = movSheet.getRow(currentRow);
+                const changeText = mov.quantity_change > 0 ? `+${mov.quantity_change}` : `${mov.quantity_change}`;
+                row.values = [
+                    new Date(mov.created_at).toLocaleDateString(),
+                    mov.movement_type.replace(/_/g, ' '),
+                    changeText,
+                    mov.quantity_after,
+                    mov.reference_id || '-'
+                ];
+                row.eachCell((cell, colNumber) => {
+                    cell.border = {
+                        top: { style: 'thin' },
+                        bottom: { style: 'thin' },
+                        left: { style: 'thin' },
+                        right: { style: 'thin' }
+                    };
+                    // Color code change column: green for positive, red for negative
+                    if (colNumber === 3) {
+                        cell.font = { color: { argb: mov.quantity_change > 0 ? 'FF16A34A' : 'FFDC2626' }, bold: true };
+                    }
+                });
+                currentRow++;
+            });
+
+            // Add empty row between groups
+            currentRow++;
+        });
+
+        movSheet.columns = [
+            { width: 15 }, { width: 20 }, { width: 12 }, { width: 12 }, { width: 15 }
+        ];
+
+        // Send file
+        const fileName = `inventory_report_${new Date().toISOString().split('T')[0]}.xlsx`;
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+
+        await workbook.xlsx.write(res);
+        res.end();
+    } catch (error) {
+        next(error);
+    }
+};
+
 module.exports = {
     getInventorySummary,
     getAllProducts,
-    createProduct
+    getActiveProducts,
+    createProduct,
+    updateProduct,
+    toggleProductStatus,
+    reportDamage,
+    getInventoryMovements,
+    exportInventoryToExcel
 };

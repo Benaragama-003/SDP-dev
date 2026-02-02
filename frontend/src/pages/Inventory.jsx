@@ -4,25 +4,16 @@ import { Search, AlertTriangle, Loader2 } from 'lucide-react';
 import api from '../services/api';
 import '../styles/Inventory.css';
 
-const mockInventoryData = [
-     { cylinder_size: '2kg', filled: 25, empty: 12, damaged: 2, new_stock: 4 },
-    { cylinder_size: '5kg', filled: 50, empty: 15, damaged: 3, new_stock: 10 },
-    { cylinder_size: '12.5kg', filled: 35, empty: 20, damaged: 2, new_stock: 8 },
-    
-    { cylinder_size: '37.5kg', filled: 40, empty: 18, damaged: 1, new_stock: 6 },
-   
-];
+
 
 const Inventory = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [inventoryData, setInventoryData] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showDamageModal, setShowDamageModal] = useState(false);
-    const [dealers] = useState([]); // Will load from API later
 
     const [damageData, setDamageData] = useState({
         productId: '',
-        dealerId: '',
         quantity: '',
         reason: ''
     });
@@ -33,9 +24,8 @@ const Inventory = () => {
             const response = await api.get('/products/inventory');
             setInventoryData(response.data.data);
         } catch (err) {
-            console.error("Failed to fetch inventory, using mock data", err);
-            // Use mock data when API fails
-            setInventoryData(mockInventoryData);
+            console.error("Failed to fetch inventory", err);
+            setInventoryData([]);
         } finally {
             setLoading(false);
         }
@@ -50,7 +40,7 @@ const Inventory = () => {
         console.log('Damage Data Submitted:', damageData);
         alert(`Damage Report submitted successfully!`);
         setShowDamageModal(false);
-        setDamageData({ productId: '', dealerId: '', quantity: '', reason: '' });
+        setDamageData({ productId: '', quantity: '', reason: '' });
     };
 
     const filteredData = (inventoryData || []).filter((item) =>
@@ -96,21 +86,20 @@ const Inventory = () => {
                                     <th>Filled</th>
                                     <th>Empty</th>
                                     <th>Damaged</th>
-                                    <th>New</th>
                                     <th>Total Stock</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {loading ? (
                                     <tr>
-                                        <td colSpan="6" style={{ textAlign: 'center', padding: '40px' }}>
+                                        <td colSpan="5" style={{ textAlign: 'center', padding: '40px' }}>
                                             <Loader2 className="spinner" size={30} style={{ margin: '0 auto' }} />
                                             <p style={{ marginTop: '10px' }}>Loading inventory...</p>
                                         </td>
                                     </tr>
                                 ) : filteredData.length === 0 ? (
                                     <tr>
-                                        <td colSpan="6" style={{ textAlign: 'center', padding: '40px' }}>
+                                        <td colSpan="5" style={{ textAlign: 'center', padding: '40px' }}>
                                             No products found in inventory.
                                         </td>
                                     </tr>
@@ -121,9 +110,8 @@ const Inventory = () => {
                                             <td>{item.filled}</td>
                                             <td>{item.empty}</td>
                                             <td style={{ color: '#dc3545' }}>{item.damaged}</td>
-                                            <td>{item.new_stock}</td>
                                             <td style={{ fontWeight: 'bold' }}>
-                                                {item.filled + item.empty + item.damaged + item.new_stock}
+                                                {(item.filled || 0) + (item.empty || 0) + (item.damaged || 0)}
                                             </td>
                                         </tr>
                                     ))

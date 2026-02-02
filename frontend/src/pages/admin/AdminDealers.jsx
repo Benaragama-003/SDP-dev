@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import AdminSidebar from '../../components/AdminSidebar';
 import { Search, Plus, Edit2, Eye, ToggleLeft, ToggleRight, Download, ChevronDown } from 'lucide-react';
@@ -18,11 +18,19 @@ const AdminDealers = () => {
     const [showExportDropdown, setShowExportDropdown] = useState(false);
     const [exporting, setExporting] = useState(false);
 
-    // Fetch dealers from backend
-    useEffect(() => {
-        fetchDealers();
-        fetchRoutes();
-    }, []);
+    const fetchDealers = useCallback(async () => {
+        try {
+            setLoading(true);
+            setError(null);
+            const response = await dealerApi.getAllDealers(searchTerm);
+            setDealers(response.data.data || []);
+        } catch (err) {
+            console.error('Error fetching dealers:', err);
+            setError(err.response?.data?.message || 'Failed to fetch dealers');
+        } finally {
+            setLoading(false);
+        }
+    }, [searchTerm]);
 
     const fetchRoutes = async () => {
         try {
@@ -32,6 +40,12 @@ const AdminDealers = () => {
             console.error('Error fetching routes:', err);
         }
     };
+
+    // Fetch dealers from backend
+    useEffect(() => {
+        fetchDealers();
+        fetchRoutes();
+    }, [fetchDealers]);
 
     const handleExport = async (route = 'all') => {
         try {
@@ -59,20 +73,6 @@ const AdminDealers = () => {
         }
     };
 
-    const fetchDealers = async () => {
-        try {
-            setLoading(true);
-            setError(null);
-            const response = await dealerApi.getAllDealers(searchTerm);
-            setDealers(response.data.data || []);
-        } catch (err) {
-            console.error('Error fetching dealers:', err);
-            setError(err.response?.data?.message || 'Failed to fetch dealers');
-        } finally {
-            setLoading(false);
-        }
-    };
-
     // Debounced search
     useEffect(() => {
         const delaySearch = setTimeout(() => {
@@ -82,7 +82,7 @@ const AdminDealers = () => {
         }, 500);
 
         return () => clearTimeout(delaySearch);
-    }, [searchTerm]);
+    }, [searchTerm, fetchDealers]);
 
     const handleToggleStatus = async (dealer) => {
         const action = dealer.status === 'ACTIVE' ? 'inactivate' : 'activate';

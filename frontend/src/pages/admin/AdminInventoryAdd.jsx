@@ -16,10 +16,28 @@ const AdminInventoryAdd = () => {
         new_purchase_price: '',
         filled_selling_price: '',
         new_selling_price: '',
-        cylinder_deposit: '',
-        initial_quantity: '0',
-        description: ''
     });
+
+    // Format number with thousand separators
+    const formatNumber = (value) => {
+        if (!value) return '';
+        const num = value.toString().replace(/,/g, '');
+        if (isNaN(num)) return value;
+        return Number(num).toLocaleString('en-IN');
+    };
+
+    // Remove formatting and get raw number
+    const parseNumber = (value) => {
+        return value.toString().replace(/,/g, '');
+    };
+
+    // Handle price input change
+    const handlePriceChange = (field, value) => {
+        const rawValue = parseNumber(value);
+        if (rawValue === '' || !isNaN(rawValue)) {
+            setFormData({ ...formData, [field]: rawValue });
+        }
+    };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -78,21 +96,21 @@ const AdminInventoryAdd = () => {
                                     <div className="form-field">
                                         <label>Filled Purchase Price (Rs)*</label>
                                         <input
-                                            type="number"
+                                            type="text"
                                             required
-                                            placeholder="0.00"
-                                            value={formData.filled_purchase_price}
-                                            onChange={(e) => setFormData({ ...formData, filled_purchase_price: e.target.value })}
+                                            placeholder="0"
+                                            value={formatNumber(formData.filled_purchase_price)}
+                                            onChange={(e) => handlePriceChange('filled_purchase_price', e.target.value)}
                                         />
                                     </div>
                                     <div className="form-field">
                                         <label>New Purchase Price (Rs)*</label>
                                         <input
-                                            type="number"
+                                            type="text"
                                             required
-                                            placeholder="0.00"
-                                            value={formData.new_purchase_price}
-                                            onChange={(e) => setFormData({ ...formData, new_purchase_price: e.target.value })}
+                                            placeholder="0"
+                                            value={formatNumber(formData.new_purchase_price)}
+                                            onChange={(e) => handlePriceChange('new_purchase_price', e.target.value)}
                                         />
                                     </div>
                                 </div>
@@ -101,54 +119,25 @@ const AdminInventoryAdd = () => {
                                     <div className="form-field">
                                         <label>Filled Selling Price (Rs)*</label>
                                         <input
-                                            type="number"
+                                            type="text"
                                             required
-                                            placeholder="0.00"
-                                            value={formData.filled_selling_price}
-                                            onChange={(e) => setFormData({ ...formData, filled_selling_price: e.target.value })}
+                                            placeholder="0"
+                                            value={formatNumber(formData.filled_selling_price)}
+                                            onChange={(e) => handlePriceChange('filled_selling_price', e.target.value)}
                                         />
                                     </div>
                                     <div className="form-field">
                                         <label>New Selling Price (Rs)*</label>
                                         <input
-                                            type="number"
+                                            type="text"
                                             required
-                                            placeholder="0.00"
-                                            value={formData.new_selling_price}
-                                            onChange={(e) => setFormData({ ...formData, new_selling_price: e.target.value })}
+                                            placeholder="0"
+                                            value={formatNumber(formData.new_selling_price)}
+                                            onChange={(e) => handlePriceChange('new_selling_price', e.target.value)}
                                         />
                                     </div>
                                 </div>
-
-                                <div className="form-field">
-                                    <label>Cylinder Deposit (Rs)</label>
-                                    <input
-                                        type="number"
-                                        placeholder="0.00"
-                                        value={formData.cylinder_deposit}
-                                        onChange={(e) => setFormData({ ...formData, cylinder_deposit: e.target.value })}
-                                    />
-                                </div>
-
-                                <div className="form-field">
-                                    <label>Initial Opening Stock (Filled Units)</label>
-                                    <input
-                                        type="number"
-                                        placeholder="0"
-                                        value={formData.initial_quantity}
-                                        onChange={(e) => setFormData({ ...formData, initial_quantity: e.target.value })}
-                                    />
-                                </div>
-
-                                <div className="form-field">
-                                    <label>Description</label>
-                                    <textarea
-                                        placeholder="Optional description"
-                                        rows="2"
-                                        value={formData.description}
-                                        onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                                    ></textarea>
-                                </div>
+                    
                             </div>
                         </div>
 

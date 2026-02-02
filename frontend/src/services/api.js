@@ -79,4 +79,42 @@ export const dealerApi = {
     deleteDealer: (id) => api.delete(`/dealers/${id}`),
 };
 
+// Product & Inventory API methods
+export const productApi = {
+    // Get all products
+    getAllProducts: () => api.get('/products'),
+
+    // Get inventory summary (grouped by size)
+    getInventorySummary: () => api.get('/products/inventory'),
+
+    // Create new product (admin only)
+    createProduct: (productData) => api.post('/products', productData),
+
+    // Update product prices (admin only)
+    updateProduct: (id, productData) => api.put(`/products/${id}`, productData),
+
+    // Get only ACTIVE products (for dropdowns in Dispatch/Purchase Orders)
+    getActiveProducts: () => api.get('/products/active'),
+
+    // Toggle product status (active/inactive)
+    toggleProductStatus: (id) => api.patch(`/products/${id}/toggle-status`),
+
+    // Report damage (admin only - warehouse)
+    reportDamage: (damageData) => api.post('/products/damage', damageData),
+
+    // Get inventory movements (history)
+    getMovements: (params = {}) => {
+        const queryString = new URLSearchParams(params).toString();
+        return api.get(`/products/movements${queryString ? `?${queryString}` : ''}`);
+    },
+
+    // Export inventory to Excel (returns blob)
+    exportToExcel: (params = {}) => {
+        const queryString = new URLSearchParams(params).toString();
+        return api.get(`/products/export${queryString ? `?${queryString}` : ''}`, {
+            responseType: 'blob'
+        });
+    },
+};
+
 export default api;

@@ -1,16 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import AdminSidebar from '../../components/AdminSidebar';
-import { Search, Plus, DollarSign, Edit2, Loader2, AlertTriangle } from 'lucide-react';
-import api from '../../services/api';
+import { Search, Plus, DollarSign, Edit2, Loader2, AlertTriangle, Download, Filter } from 'lucide-react';
+import { productApi } from '../../services/api';
 import '../../styles/Inventory.css';
 
-const mockInventoryData = [
-    { cylinder_size: '5kg', filled: 50, empty: 15, damaged: 3, new_stock: 10 },
-    { cylinder_size: '12.5kg', filled: 35, empty: 20, damaged: 2, new_stock: 8 },
-   
-    { cylinder_size: '37.5kg', filled: 40, empty: 18, damaged: 1, new_stock: 6 },
-];
 
 const AdminInventory = () => {
     const [searchTerm, setSearchTerm] = useState('');
@@ -18,22 +12,40 @@ const AdminInventory = () => {
     const [loading, setLoading] = useState(true);
     const [showPriceUpdate, setShowPriceUpdate] = useState(false);
     const [showDamageModal, setShowDamageModal] = useState(false);
-    const [dealers] = useState([]); // Could be fetched from API later
-
+    const [showExportModal, setShowExportModal] = useState(false);
+    const [exportFilters, setExportFilters] = useState({ start_date: '', end_date: '' });
+    const [products, setProducts] = useState([]); // For dropdown (has product_id)
+    const [selectedProduct, setSelectedProduct] = useState('');
+    const [priceForm, setPriceForm] = useState({
+        filled_selling_price: '',
+        new_selling_price: ''
+    });
+    const [damageForm, setDamageForm] = useState({
+        product_id: '',
+        quantity_damaged: '',
+        damage_reason: ''
+    });
+    const [submitting, setSubmitting] = useState(false);
+    const [showProductsModal, setShowProductsModal] = useState(false);
+    const [expandedProduct, setExpandedProduct] = useState(null);
     const navigate = useNavigate();
 
     const fetchInventory = async () => {
-        try {
-            setLoading(true);
-            const response = await api.get('/products/inventory');
-            setInventoryData(response.data.data);
-        } catch (err) {
-            console.error("Failed to fetch inventory", err);
-            setInventoryData(mockInventoryData); 
-        } finally {
-            setLoading(false);
-        }
-    };
+    try {
+        setLoading(true);
+        const [invResponse, prodResponse] = await Promise.all([
+            productApi.getInventorySummary(),
+            productApi.getAllProducts()
+        ]);
+        setInventoryData(invResponse.data.data);
+        setProducts(prodResponse.data.data);
+    } catch (err) {
+        console.error("Failed to fetch inventory", err);
+        setInventoryData([]);
+    } finally {
+        setLoading(false);
+    }
+};
 
     useEffect(() => {
         fetchInventory();
@@ -43,18 +55,94 @@ const AdminInventory = () => {
         item.cylinder_size.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
-    const handlePriceUpdate = (e) => {
-        e.preventDefault();
-        alert('Price updates will be implemented soon!');
+const handlePriceUpdate = async (e) => {
+    e.preventDefault();
+    if (!selectedProduct) {
+        alert('Please select a product');
+        return;
+    }
+    try {
+        setSubmitting(true);
+        await productApi.updateProduct(selectedProduct, {
+            filled_selling_price: priceForm.filled_selling_price || undefined,
+            new_selling_price: priceForm.new_selling_price || undefined
+        });
+        alert('Prices updated successfully!');
         setShowPriceUpdate(false);
-    };
+        setPriceForm({ filled_selling_price: '', new_selling_price: '' });
+        setSelectedProduct('');
+        fetchInventory();
+    } catch (err) {
+        console.error('Failed to update prices', err);
+        alert('Failed to update prices: ' + (err.response?.data?.message || err.message));
+    } finally {
+        setSubmitting(false);
+    }
+};
 
-    const handleDamageReport = (e) => {
-        e.preventDefault();
-        alert('Damage reporting will be implemented soon!');
+const handleDamageReport = async (e) => {
+    e.preventDefault();
+    if (!damageForm.product_id || !damageForm.quantity_damaged || !damageForm.damage_reason) {
+        alert('Please fill all fields');
+        return;
+    }
+    try {
+        setSubmitting(true);
+        await productApi.reportDamage({
+            product_id: damageForm.product_id,
+            quantity_damaged: parseInt(damageForm.quantity_damaged),
+            damage_reason: damageForm.damage_reason
+        });
+        alert('Damage reported successfully!');
         setShowDamageModal(false);
-    };
+        setDamageForm({ product_id: '', quantity_damaged: '', damage_reason: '' });
+        fetchInventory();
+    } catch (err) {
+        console.error('Failed to report damage', err);
+        alert('Failed to report damage: ' + (err.response?.data?.message || err.message));
+    } finally {
+        setSubmitting(false);
+    }
+};
 
+const handleToggleProductStatus = async (productId, currentStatus) => {
+    if (!window.confirm(`Are you sure you want to ${currentStatus === 'ACTIVE' ? 'deactivate' : 'activate'} this product?`)) {
+        return;
+    }
+    try {
+        await productApi.toggleProductStatus(productId);
+        fetchInventory();
+    } catch (err) {
+        console.error('Failed to toggle status', err);
+        alert('Failed to update status: ' + (err.response?.data?.message || err.message));
+    }
+};
+
+const handleExport = async () => {
+    try {
+        const params = {};
+        if (exportFilters.start_date) params.start_date = exportFilters.start_date;
+        if (exportFilters.end_date) params.end_date = exportFilters.end_date;
+        
+        const response = await productApi.exportToExcel(params);
+        const blob = new Blob([response.data], { 
+            type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
+        });
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `inventory_report_${new Date().toISOString().split('T')[0]}.xlsx`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+        setShowExportModal(false);
+        setExportFilters({ start_date: '', end_date: '' });
+    } catch (err) {
+        console.error('Failed to export', err);
+        alert('Failed to export inventory report. Please try again later.');
+    }
+};
     return (
         <>
             <AdminSidebar />
@@ -66,6 +154,18 @@ const AdminInventory = () => {
                             <p className="page-subtitle">Manage stock and pricing breakdown</p>
                         </div>
                         <div style={{ display: 'flex', gap: '12px' }}>
+                            <button className="btn btn-secondary" onClick={() => setShowProductsModal(true)}>
+                                View Products
+                            </button>
+                            <button className="btn btn-secondary" onClick={() => setShowExportModal(true)}>
+                                <Download size={20} />
+                                Export Excel
+                            </button>
+                        </div>
+                    </div>
+                                            
+                    <div style={{ display: 'flex', gap: '12px', marginBottom: '20px' }}>
+
                             <button className="btn btn-primary" onClick={() => navigate('/admin/inventory/add')}>
                                 <Plus size={20} />
                                 Add Product
@@ -78,8 +178,8 @@ const AdminInventory = () => {
                                 <AlertTriangle size={20} />
                                 Report Damage
                             </button>
+
                         </div>
-                    </div>
 
                     <div className="table-container">
                         <div className="table-header">
@@ -102,34 +202,45 @@ const AdminInventory = () => {
                                     <th>Filled</th>
                                     <th>Empty</th>
                                     <th>Damaged</th>
-                                    <th>New</th>
                                     <th>Total Stock</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {loading ? (
                                     <tr>
-                                        <td colSpan="6" style={{ textAlign: 'center', padding: '40px' }}>
+                                        <td colSpan="5" style={{ textAlign: 'center', padding: '40px' }}>
                                             <Loader2 className="spinner" size={30} style={{ margin: '0 auto' }} />
                                             <p style={{ marginTop: '10px' }}>Loading inventory...</p>
                                         </td>
                                     </tr>
                                 ) : filteredData.length === 0 ? (
                                     <tr>
-                                        <td colSpan="6" style={{ textAlign: 'center', padding: '40px' }}>
+                                        <td colSpan="5" style={{ textAlign: 'center', padding: '40px' }}>
                                             No products found in inventory.
                                         </td>
                                     </tr>
                                 ) : (
                                     filteredData.map((item, index) => (
-                                        <tr key={index}>
-                                            <td style={{ fontWeight: '600' }}>{item.cylinder_size}</td>
+                                        <tr key={index} style={{ opacity: item.status === 'DISCONTINUED' ? 0.6 : 1 }}>
+                                            <td style={{ fontWeight: '600' }}>
+                                                {item.cylinder_size}
+                                                {item.status === 'DISCONTINUED' && (
+                                                    <span style={{
+                                                        marginLeft: '8px',
+                                                        padding: '2px 6px',
+                                                        fontSize: '10px',
+                                                        backgroundColor: '#6c757d',
+                                                        color: 'white',
+                                                        borderRadius: '4px'
+                                                    }}>INACTIVE</span>
+                                                )}
+                                            </td>
                                             <td>{item.filled}</td>
                                             <td>{item.empty}</td>
                                             <td style={{ color: '#dc3545' }}>{item.damaged}</td>
-                                            <td>{item.new_stock}</td>
+                                       
                                             <td style={{ fontWeight: 'bold' }}>
-                                                {item.filled + item.empty + item.damaged + item.new_stock}
+                                                {(item.filled || 0) + (item.empty || 0) + (item.damaged || 0)}
                                             </td>
                                         </tr>
                                     ))
@@ -144,48 +255,63 @@ const AdminInventory = () => {
                     <div className="modal-overlay" onClick={() => setShowPriceUpdate(false)}>
                         <div className="modal-content" onClick={e => e.stopPropagation()}>
                             <div className="modal-header">
-                                <h2 className="modal-title">Bulk Price Update</h2>
+                                <h2 className="modal-title">Update Selling Prices</h2>
                                 <button className="modal-close" onClick={() => setShowPriceUpdate(false)}>×</button>
                             </div>
                             <form onSubmit={handlePriceUpdate}>
                                 <div className="modal-body">
                                     <div className="form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
                                         <div className="form-field" style={{ gridColumn: '1 / -1' }}>
-                                            <label>Select Cylinder Size</label>
-                                            <select required>
-                                                <option value="">Select size...</option>
-                                                {inventoryData.map((item, idx) => (
-                                                    <option key={idx} value={item.cylinder_size}>
-                                                        {item.cylinder_size}
+                                            <label>Select Product</label>
+                                            <select 
+                                                required
+                                                value={selectedProduct}
+                                                onChange={(e) => setSelectedProduct(e.target.value)}
+                                            >
+                                                <option value="">Select product...</option>
+                                                {products.map((p) => (
+                                                    <option key={p.product_id} value={p.product_id}>
+                                                        {p.cylinder_size} ({p.product_code})
                                                     </option>
                                                 ))}
                                             </select>
                                         </div>
                                         <div className="form-field">
-                                            <label>Update Filled Price (Rs)</label>
-                                            <input type="number" placeholder="New price" />
+                                            <label>Filled Selling Price (Rs)</label>
+                                            <input 
+                                                type="number" 
+                                                placeholder="New price" 
+                                                value={priceForm.filled_selling_price}
+                                                onChange={(e) => setPriceForm({...priceForm, filled_selling_price: e.target.value})}
+                                            />
                                         </div>
                                         <div className="form-field">
-                                            <label>Update New Price (Rs)</label>
-                                            <input type="number" placeholder="New price" />
+                                            <label>New Cylinder Price (Rs)</label>
+                                            <input 
+                                                type="number" 
+                                                placeholder="New price" 
+                                                value={priceForm.new_selling_price}
+                                                onChange={(e) => setPriceForm({...priceForm, new_selling_price: e.target.value})}
+                                            />
                                         </div>
                                     </div>
                                 </div>
                                 <div className="modal-footer" style={{ padding: '20px', display: 'flex', justifyContent: 'flex-end', gap: '10px', borderTop: '1px solid #eee' }}>
                                     <button type="button" className="btn btn-danger" onClick={() => setShowPriceUpdate(false)}>Cancel</button>
-                                    <button type="submit" className="btn btn-primary">Update Prices</button>
+                                    <button type="submit" className="btn btn-primary" disabled={submitting}>
+                                        {submitting ? 'Updating...' : 'Update Prices'}
+                                    </button>
                                 </div>
                             </form>
                         </div>
                     </div>
                 )}
-
                 {/* Damage Report Modal */}
                 {showDamageModal && (
                     <div className="modal-overlay" onClick={() => setShowDamageModal(false)}>
                         <div className="modal-content" onClick={e => e.stopPropagation()}>
                             <div className="modal-header">
-                                <h2 className="modal-title">Report Damage Inventory</h2>
+                                <h2 className="modal-title">Report Warehouse Damage</h2>
                                 <button className="modal-close" onClick={() => setShowDamageModal(false)}>×</button>
                             </div>
                             <form onSubmit={handleDamageReport}>
@@ -193,30 +319,230 @@ const AdminInventory = () => {
                                     <div className="form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '15px' }}>
                                         <div className="form-field">
                                             <label>Product (Cylinder Size)</label>
-                                            <select required>
-                                                <option value="">Select Size...</option>
-                                                {inventoryData.map((item, idx) => (
-                                                    <option key={idx} value={item.cylinder_size}>
-                                                        {item.cylinder_size}
+                                            <select 
+                                                required
+                                                value={damageForm.product_id}
+                                                onChange={(e) => setDamageForm({...damageForm, product_id: e.target.value})}
+                                            >
+                                                <option value="">Select product...</option>
+                                                {products.map((p) => (
+                                                    <option key={p.product_id} value={p.product_id}>
+                                                        {p.cylinder_size} ({p.product_code})
                                                     </option>
                                                 ))}
                                             </select>
                                         </div>
                                         <div className="form-field">
                                             <label>Quantity Damaged</label>
-                                            <input type="number" required placeholder="0" min="1" />
+                                            <input 
+                                                type="number" 
+                                                required 
+                                                placeholder="0" 
+                                                min="1"
+                                                value={damageForm.quantity_damaged}
+                                                onChange={(e) => setDamageForm({...damageForm, quantity_damaged: e.target.value})}
+                                            />
                                         </div>
                                         <div className="form-field">
-                                            <label>Reason / Notes</label>
-                                            <textarea required placeholder="Describe the damage..." rows="3"></textarea>
+                                            <label>Damage Reason</label>
+                                            <textarea 
+                                                required 
+                                                placeholder="Describe the damage..." 
+                                                rows="3"
+                                                value={damageForm.damage_reason}
+                                                onChange={(e) => setDamageForm({...damageForm, damage_reason: e.target.value})}
+                                            ></textarea>
                                         </div>
                                     </div>
                                 </div>
                                 <div className="modal-footer" style={{ padding: '20px', display: 'flex', justifyContent: 'flex-end', gap: '10px', borderTop: '1px solid #eee' }}>
                                     <button type="button" className="btn btn-secondary" onClick={() => setShowDamageModal(false)}>Cancel</button>
-                                    <button type="submit" className="btn btn-danger" style={{ backgroundColor: '#dc3545', color: 'white' }}>Submit Report</button>
+                                    <button type="submit" className="btn btn-danger" style={{ backgroundColor: '#dc3545', color: 'white' }} disabled={submitting}>
+                                        {submitting ? 'Submitting...' : 'Submit Report'}
+                                    </button>
                                 </div>
                             </form>
+                        </div>
+                    </div>
+                )}
+
+                {/* Products List Modal */}
+                {showProductsModal && (
+                    <div className="modal-overlay" onClick={() => setShowProductsModal(false)}>
+                        <div className="modal-content" style={{ maxWidth: '600px' }} onClick={e => e.stopPropagation()}>
+                            <div className="modal-header">
+                                <h2 className="modal-title">All Products</h2>
+                                <button className="modal-close" onClick={() => setShowProductsModal(false)}>×</button>
+                            </div>
+                            <div className="modal-body" style={{ maxHeight: '500px', overflowY: 'auto', padding: '0' }}>
+                                {products.length === 0 ? (
+                                    <div style={{ textAlign: 'center', padding: '40px', color: '#666' }}>
+                                        No products added yet. Click "Add Product" to create one.
+                                    </div>
+                                ) : (
+                                    products.map((p) => (
+                                        <div key={p.product_id} style={{ borderBottom: '1px solid #eee' }}>
+                                            <div 
+                                                style={{ 
+                                                    display: 'grid',
+                                                    gridTemplateColumns: '100px 80px 70px 1fr',
+                                                    alignItems: 'center', 
+                                                    padding: '15px 20px',
+                                                    gap: '15px',
+                                                    backgroundColor: expandedProduct === p.product_id ? '#f8f9fa' : 'white'
+                                                }}
+                                            >
+                                                <span style={{ fontWeight: '600', color: '#6B21A8' }}>{p.product_code}</span>
+                                                <span>{p.cylinder_size}</span>
+                                                <span 
+                                                    onClick={() => handleToggleProductStatus(p.product_id, p.status)}
+                                                    style={{ 
+                                                        padding: '4px 10px', 
+                                                        borderRadius: '12px', 
+                                                        fontSize: '11px',
+                                                        cursor: 'pointer',
+                                                        backgroundColor: p.status === 'ACTIVE' ? '#dcfce7' : '#fee2e2',
+                                                        color: p.status === 'ACTIVE' ? '#16a34a' : '#dc2626',
+                                                        textAlign: 'center'
+                                                    }}
+                                                    title="Click to toggle status"
+                                                >
+                                                    {p.status === 'ACTIVE' ? 'ACTIVE' : 'INACTIVE'}
+                                                </span>
+                                                <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                                                    <button 
+                                                        className="btn btn-secondary" 
+                                                        style={{ padding: '5px 12px', fontSize: '12px' }}
+                                                        onClick={() => setExpandedProduct(expandedProduct === p.product_id ? null : p.product_id)}
+                                                    >
+                                                        {expandedProduct === p.product_id ? 'Hide' : 'View'}
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            {expandedProduct === p.product_id && (
+                                                <div style={{ padding: '15px 20px', backgroundColor: '#f8f9fa' }}>
+                                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                                                        <div style={{ padding: '15px', backgroundColor: 'white', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
+                                                            <h4 style={{ margin: '0 0 10px 0', fontSize: '14px', color: '#6B21A8' }}>Supplier Prices (Purchase)</h4>
+                                                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px' }}>
+                                                                <span style={{ color: '#666', fontSize: '13px' }}>Filled:</span>
+                                                                <span style={{ fontWeight: '600' }}>Rs. {parseFloat(p.filled_purchase_price || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                                                            </div>
+                                                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                                                <span style={{ color: '#666', fontSize: '13px' }}>New:</span>
+                                                                <span style={{ fontWeight: '600' }}>Rs. {parseFloat(p.new_purchase_price || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                                                            </div>
+                                                        </div>
+                                                        <div style={{ padding: '15px', backgroundColor: 'white', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
+                                                            <h4 style={{ margin: '0 0 10px 0', fontSize: '14px', color: '#16a34a' }}>Dealer Prices (Selling)</h4>
+                                                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px' }}>
+                                                                <span style={{ color: '#666', fontSize: '13px' }}>Filled:</span>
+                                                                <span style={{ fontWeight: '600' }}>Rs. {parseFloat(p.filled_selling_price || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                                                            </div>
+                                                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                                                <span style={{ color: '#666', fontSize: '13px' }}>New:</span>
+                                                                <span style={{ fontWeight: '600' }}>Rs. {parseFloat(p.new_selling_price || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+                            <div className="modal-footer" style={{ padding: '15px 20px', display: 'flex', justifyContent: 'flex-end', borderTop: '1px solid #eee' }}>
+                                <button className="btn btn-secondary" onClick={() => setShowProductsModal(false)}>Close</button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Export Filter Modal */}
+                {showExportModal && (
+                    <div className="modal-overlay" onClick={() => setShowExportModal(false)}>
+                        <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '450px' }}>
+                            <div className="modal-header">
+                                <h2 className="modal-title">Export Inventory Report</h2>
+                                <button className="modal-close" onClick={() => setShowExportModal(false)}>×</button>
+                            </div>
+                            <div className="modal-body" style={{ padding: '20px' }}>
+                                <p style={{ marginBottom: '20px', color: '#666' }}>
+                                    Export current inventory and stock movements to Excel. 
+                                
+                                </p>
+                                
+                                <div style={{ marginBottom: '15px' }}>
+                                    <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500' }}>
+                                        Start Date (optional)
+                                    </label>
+                                    <input
+                                        type="date"
+                                        value={exportFilters.start_date}
+                                        onChange={(e) => setExportFilters(prev => ({ ...prev, start_date: e.target.value }))}
+                                        style={{
+                                            width: '100%',
+                                            padding: '10px',
+                                            borderRadius: '6px',
+                                            border: '1px solid #ddd',
+                                            fontSize: '14px'
+                                        }}
+                                    />
+                                </div>
+                                
+                                <div style={{ marginBottom: '20px' }}>
+                                    <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500' }}>
+                                        End Date (optional)
+                                    </label>
+                                    <input
+                                        type="date"
+                                        value={exportFilters.end_date}
+                                        onChange={(e) => setExportFilters(prev => ({ ...prev, end_date: e.target.value }))}
+                                        style={{
+                                            width: '100%',
+                                            padding: '10px',
+                                            borderRadius: '6px',
+                                            border: '1px solid #ddd',
+                                            fontSize: '14px'
+                                        }}
+                                    />
+                                </div>
+
+                                <div style={{ 
+                                    backgroundColor: '#f0f9ff', 
+                                    padding: '12px', 
+                                    borderRadius: '8px',
+                                    fontSize: '13px',
+                                    color: '#0369a1'
+                                }}>
+                                    <strong>Note:</strong> The exported Excel will have 2 sheets:
+                                    <ul style={{ margin: '8px 0 0 0', paddingLeft: '20px' }}>
+                                        <li>Current Inventory (all products)</li>
+                                        <li>Stock Movements (grouped by product)</li>
+                                    </ul>
+                                </div>
+                            </div>
+                            <div className="modal-footer" style={{ 
+                                padding: '15px 20px', 
+                                display: 'flex', 
+                                justifyContent: 'flex-end', 
+                                gap: '10px',
+                                borderTop: '1px solid #eee' 
+                            }}>
+                                <button 
+                                    className="btn btn-secondary" 
+                                    onClick={() => {
+                                        setShowExportModal(false);
+                                        setExportFilters({ start_date: '', end_date: '' });
+                                    }}
+                                >
+                                    Cancel
+                                </button>
+                                <button className="btn btn-primary" onClick={handleExport}>
+                                    <Download size={18} />
+                                    Export Now
+                                </button>
+                            </div>
                         </div>
                     </div>
                 )}
