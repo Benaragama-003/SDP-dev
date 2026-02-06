@@ -1,33 +1,134 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import AdminSidebar from '../../components/AdminSidebar';
-import { MapPin, Truck, Plus, FileText } from 'lucide-react';
+import { MapPin, Truck, Plus, FileText, RefreshCw } from 'lucide-react';
 import '../../styles/Dispatch.css';
 import { formatDate } from '../../utils/dateUtils';
 import DateInput from '../../components/DateInput';
+import { dispatchApi } from '../../services/api';
 
 const AdminDispatch = () => {
     const navigate = useNavigate();
-    const [selectedSupervisors, setSelectedSupervisors] = useState([]);
     const [allocatedItems, setAllocatedItems] = useState([{ product_id: '', quantity: '' }]);
     const [dispatchDate, setDispatchDate] = useState(new Date().toISOString().split('T')[0]);
+    const [selectedLorry, setSelectedLorry] = useState('');
+    const [selectedSupervisor, setSelectedSupervisor] = useState('');
+    const [selectedRoute, setSelectedRoute] = useState('');
+    
+    // Real data from API
+    const [supervisors, setSupervisors] = useState([]);
+    const [lorries, setLorries] = useState([]);
+    const [products, setProducts] = useState([]);
+    const [routes, setRoutes] = useState([]);
+    const [dispatches, setDispatches] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [submitting, setSubmitting] = useState(false);
 
-    // Mock supervisor data with locations
-    const supervisors = [
-        { id: 'S001', name: 'Chamika Denuwan', route: 'Route A', location: { lat: 6.9271, lng: 79.8612 }, status: 'available' },
-        { id: 'S002', name: 'Nethindu Chandula', route: 'Route B', location: { lat: 6.9319, lng: 79.8478 }, status: 'on-duty' },
-        { id: 'S003', name: 'Akila Benaragama', route: 'Route C', location: { lat: 6.9022, lng: 79.8607 }, status: 'available' },
-    ];
+    // Fetch resources and dispatches on mount
+    useEffect(() => {
+        fetchData();
+    }, []);
 
-    const lorries = [
-        { id: 'L001', number: 'CAA-1234', status: 'available', capacity: '5 tons' },
-        { id: 'L002', number: 'CAB-5678', status: 'available', capacity: '5 tons' },
-        { id: 'L003', number: 'CAC-9012', status: 'on-duty', capacity: '10 tons' },
-    ];
+    const fetchData = async () => {
+        setLoading(true);
+        try {
+            const [resourcesRes, dispatchesRes] = await Promise.all([
+                dispatchApi.getResources(),
+                dispatchApi.getAll({ status: 'SCHEDULED,IN_PROGRESS,AWAITING_UNLOAD', limit: 10 })
+            ]);
+            
+            console.log('Resources:', resourcesRes.data);
+            console.log('Dispatches:', dispatchesRes.data);
+            
+            setSupervisors(resourcesRes.data.data?.supervisors || []);
+            setLorries(resourcesRes.data.data?.lorries || []);
+            setProducts(resourcesRes.data.data?.products || []);
+            setRoutes(resourcesRes.data.data?.routes || []);
+            setDispatches(dispatchesRes.data.data?.dispatches || []);
+        } catch (error) {
+            console.error('Failed to fetch data:', error);
+            console.error('Error response:', error.response?.data);
+            alert('Failed to load dispatch data: ' + (error.response?.data?.message || error.message));
+        } finally {
+            setLoading(false);
+        }
+    };
 
-    const handleCreateDispatch = (e) => {
+    const handleCreateDispatch = async (e) => {
         e.preventDefault();
-        alert('Dispatch created successfully!');
+        
+        // Validate items
+        const validItems = allocatedItems.filter(item => item.product_id && item.quantity > 0);
+        if (validItems.length === 0) {
+            alert('Please add at least one product to the dispatch');
+            return;
+        }
+        
+        setSubmitting(true);
+        try {
+            await dispatchApi.create({
+                lorry_id: selectedLorry,
+                supervisor_id: selectedSupervisor,
+                route: selectedRoute,
+                dispatch_date: dispatchDate,
+                items: validItems.map(item => ({
+                    product_id: item.product_id,
+                    loaded_quantity: parseInt(item.quantity)
+                }))
+            });
+            
+            alert('Dispatch created successfully!');
+            // Reset form
+            setSelectedLorry('');
+            setSelectedSupervisor('');
+            setSelectedRoute('');
+            setAllocatedItems([{ product_id: '', quantity: '' }]);
+            setDispatchDate(new Date().toISOString().split('T')[0]);
+            // Refresh data
+            fetchData();
+        } catch (error) {
+            console.error('Failed to create dispatch:', error);
+            alert(error.response?.data?.message || 'Failed to create dispatch');
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    const handleCancelDispatch = async (dispatchId) => {
+        if (!window.confirm('Are you sure you want to cancel this dispatch?')) return;
+        
+        try {
+            await dispatchApi.cancel(dispatchId);
+            alert('Dispatch cancelled successfully');
+            fetchData();
+        } catch (error) {
+            console.error('Failed to cancel dispatch:', error);
+            alert(error.response?.data?.message || 'Failed to cancel dispatch');
+        }
+    };
+
+    const handleAcceptUnload = async (dispatchId) => {
+        if (!window.confirm('Accept unload and return remaining stock to warehouse?')) return;
+        
+        try {
+            await dispatchApi.acceptUnload(dispatchId);
+            alert('Unload accepted. Stock returned to warehouse.');
+            fetchData();
+        } catch (error) {
+            console.error('Failed to accept unload:', error);
+            alert(error.response?.data?.message || 'Failed to accept unload');
+        }
+    };
+
+    const getStatusBadgeClass = (status) => {
+        switch (status) {
+            case 'SCHEDULED': return 'badge-secondary';
+            case 'IN_PROGRESS': return 'badge-primary';
+            case 'AWAITING_UNLOAD': return 'badge-warning';
+            case 'UNLOADED': return 'badge-success';
+            case 'CANCELLED': return 'badge-danger';
+            default: return 'badge-secondary';
+        }
     };
 
     return (
@@ -82,25 +183,29 @@ const AdminDispatch = () => {
                         <form onSubmit={handleCreateDispatch} className="dispatch-form">
                             <h3 className="section-title">Create New Dispatch</h3>
 
+                            {loading ? (
+                                <p style={{ textAlign: 'center', padding: '20px' }}>Loading resources...</p>
+                            ) : (
+                            <>
                             <div className="form-grid">
                                 <div className="form-field">
-                                    <label>Select Lorry*</label>
-                                    <select required>
+                                    <label>Select Lorry* {lorries.length === 0 && <span style={{ color: '#999', fontSize: '12px' }}>(No available lorries)</span>}</label>
+                                    <select required value={selectedLorry} onChange={(e) => setSelectedLorry(e.target.value)}>
                                         <option value="">Choose a lorry</option>
-                                        {lorries.filter(l => l.status === 'available').map(lorry => (
-                                            <option key={lorry.id} value={lorry.id}>
-                                                {lorry.number}
+                                        {lorries.map(lorry => (
+                                            <option key={lorry.lorry_id} value={lorry.lorry_id}>
+                                                {lorry.plate_number} 
                                             </option>
                                         ))}
                                     </select>
                                 </div>
 
                                 <div className="form-field">
-                                    <label>Select Supervisor*</label>
-                                    <select required>
+                                    <label>Select Supervisor* {supervisors.length === 0 && <span style={{ color: '#999', fontSize: '12px' }}>(No available supervisors)</span>}</label>
+                                    <select required value={selectedSupervisor} onChange={(e) => setSelectedSupervisor(e.target.value)}>
                                         <option value="">Choose supervisor</option>
-                                        {supervisors.filter(s => s.status === 'available').map(sup => (
-                                            <option key={sup.id} value={sup.id}>
+                                        {supervisors.map(sup => (
+                                            <option key={sup.user_id} value={sup.user_id}>
                                                 {sup.name}
                                             </option>
                                         ))}
@@ -109,11 +214,11 @@ const AdminDispatch = () => {
 
                                 <div className="form-field">
                                     <label>Route*</label>
-                                    <select required>
+                                    <select required value={selectedRoute} onChange={(e) => setSelectedRoute(e.target.value)}>
                                         <option value="">Select route</option>
-                                        <option value="Route A">Route A</option>
-                                        <option value="Route B">Route B</option>
-                                        <option value="Route C">Route C</option>
+                                        {routes.map(route => (
+                                            <option key={route} value={route}>{route}</option>
+                                        ))}
                                     </select>
                                 </div>
 
@@ -144,8 +249,10 @@ const AdminDispatch = () => {
                                     {allocatedItems.length === 0 && (
                                         <p style={{ textAlign: 'center', color: '#999', padding: '20px', fontSize: '14px', border: '1px dashed #ddd', borderRadius: '10px' }}>No products allocated yet. Click "Add Product" to start.</p>
                                     )}
-                                    {allocatedItems.map((item, index) => (
-                                        <div key={index} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 40px', gap: '15px', marginBottom: '12px', alignItems: 'center' }}>
+                                    {allocatedItems.map((item, index) => {
+                                        const selectedProduct = products.find(p => p.product_id === item.product_id);
+                                        return (
+                                        <div key={index} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 40px', gap: '15px', marginBottom: '12px', alignItems: 'center' }}>
                                             <select
                                                 style={{ padding: '10px', borderRadius: '8px', border: '1px solid #ddd' }}
                                                 value={item.product_id}
@@ -157,16 +264,17 @@ const AdminDispatch = () => {
                                                 required
                                             >
                                                 <option value="">Select Product</option>
-                                                <option value="2kg">2kg Cylinder</option>
-                                                <option value="5kg">5kg Cylinder</option>
-                                                <option value="12.5kg">12.5kg Cylinder</option>
-                                                <option value="37.5kg">37.5kg Cylinder</option>
-                                                <option value="20kg">20kg Cylinder</option>
+                                                {products.map(product => (
+                                                    <option key={product.product_id} value={product.product_id}>
+                                                        {product.size} - {product.type} (Avail: {product.filled_stock})
+                                                    </option>
+                                                ))}
                                             </select>
                                             <input
                                                 type="number"
                                                 placeholder="Qty"
                                                 min="1"
+                                                max={selectedProduct?.filled_stock || 999}
                                                 style={{ padding: '10px', borderRadius: '8px', border: '1px solid #ddd' }}
                                                 value={item.quantity}
                                                 onChange={(e) => {
@@ -176,6 +284,9 @@ const AdminDispatch = () => {
                                                 }}
                                                 required
                                             />
+                                            <span style={{ fontSize: '12px', color: '#666' }}>
+                                                {selectedProduct ? `Max: ${selectedProduct.filled_stock}` : ''}
+                                            </span>
                                             <button
                                                 type="button"
                                                 onClick={() => setAllocatedItems(allocatedItems.filter((_, i) => i !== index))}
@@ -184,21 +295,33 @@ const AdminDispatch = () => {
                                                 ×
                                             </button>
                                         </div>
-                                    ))}
+                                        );
+                                    })}
                                 </div>
                             </div>
 
                             <div className="form-actions" style={{ marginTop: '30px' }}>
-                                <button type="submit" className="btn btn-primary" style={{ width: '100%' }}>
+                                <button type="submit" className="btn btn-primary" style={{ width: '100%' }} disabled={submitting}>
                                     <Truck size={20} />
-                                    Confirm Dispatch & Allocation
+                                    {submitting ? 'Creating...' : 'Confirm Dispatch & Allocation'}
                                 </button>
                             </div>
+                            </>
+                            )}
                         </form>
 
                         {/* Recent Dispatches Section */}
                         <div className="dispatch-section" style={{ marginTop: '40px' }}>
-                            <h3 className="section-title">Recent Dispatches</h3>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+                                <h3 className="section-title" style={{ margin: 0 }}>Recent Dispatches</h3>
+                                <button
+                                    type="button"
+                                    onClick={fetchData}
+                                    style={{ backgroundColor: 'transparent', border: '1px solid #ddd', padding: '8px 15px', borderRadius: '8px', fontSize: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}
+                                >
+                                    <RefreshCw size={14} /> Refresh
+                                </button>
+                            </div>
                             <div className="table-container" style={{ padding: '0', border: 'none', boxShadow: 'none' }}>
                                 <table className="data-table">
                                     <thead>
@@ -207,56 +330,59 @@ const AdminDispatch = () => {
                                             <th>Date</th>
                                             <th>Lorry</th>
                                             <th>Supervisor</th>
+                                            <th>Route</th>
                                             <th>Status</th>
                                             <th style={{ textAlign: 'center' }}>Actions</th>
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {/* Mocking mixed state dispatches */}
-                                        {[
-                                            { id: 'DSP-001', date: '2026-01-27', lorry: 'CAA-1234', supervisor: 'John Supervisor', status: 'scheduled' },
-                                            { id: 'DSP-002', date: '2026-01-26', lorry: 'CAB-5678', supervisor: 'Jane Smith', status: 'awaiting-unload' },
-                                            { id: 'DSP-003', date: '2026-01-26', lorry: 'CAC-9012', supervisor: 'Mike Johnson', status: 'in-progress' }
-                                        ].map((dispatch) => (
-                                            <tr key={dispatch.id}>
-                                                <td style={{ fontWeight: '600' }}>{dispatch.id}</td>
-                                                <td>{formatDate(dispatch.date)}</td>
-                                                <td>{dispatch.lorry}</td>
-                                                <td>{dispatch.supervisor}</td>
+                                        {dispatches.length === 0 ? (
+                                            <tr>
+                                                <td colSpan="7" style={{ textAlign: 'center', padding: '30px', color: '#666' }}>
+                                                    No active dispatches found
+                                                </td>
+                                            </tr>
+                                        ) : (
+                                        dispatches.map((dispatch) => (
+                                            <tr key={dispatch.dispatch_id}>
+                                                <td style={{ fontWeight: '600' }}>{dispatch.dispatch_id}</td>
+                                                <td>{formatDate(dispatch.dispatch_date)}</td>
+                                                <td>{dispatch.plate_number}</td>
+                                                <td>{dispatch.supervisor_name}</td>
+                                                <td>{dispatch.route}</td>
                                                 <td>
-                                                    <span className={`badge badge-${dispatch.status === 'scheduled' ? 'secondary' :
-                                                        dispatch.status === 'awaiting-unload' ? 'warning' : 'primary'
-                                                        }`}>
-                                                        {dispatch.status.replace('-', ' ')}
+                                                    <span className={`badge ${getStatusBadgeClass(dispatch.status)}`}>
+                                                        {dispatch.status.replace('_', ' ')}
                                                     </span>
                                                 </td>
                                                 <td>
                                                     <div style={{ display: 'flex', justifyContent: 'center', gap: '8px' }}>
-                                                        {dispatch.status === 'scheduled' && (
+                                                        {dispatch.status === 'SCHEDULED' && (
                                                             <button
                                                                 className="btn btn-sm btn-danger"
                                                                 style={{ fontSize: '12px', padding: '5px 10px' }}
-                                                                onClick={() => alert(`Cancelling ${dispatch.id}`)}
+                                                                onClick={() => handleCancelDispatch(dispatch.dispatch_id)}
                                                             >
                                                                 Cancel
                                                             </button>
                                                         )}
-                                                        {dispatch.status === 'awaiting-unload' && (
+                                                        {dispatch.status === 'AWAITING_UNLOAD' && (
                                                             <button
                                                                 className="btn btn-sm btn-success"
-                                                                style={{ fontSize: '12px', padding: '5px 10px', backgroundColor: '#101540', color: 'white', border: 'none' }}
-                                                                onClick={() => alert(`Accepting Unload for ${dispatch.id}`)}
+                                                                style={{ fontSize: '12px', padding: '5px 10px', backgroundColor: '#28a745', color: 'white', border: 'none' }}
+                                                                onClick={() => handleAcceptUnload(dispatch.dispatch_id)}
                                                             >
                                                                 Accept Unload
                                                             </button>
                                                         )}
-                                                        {(dispatch.status === 'in-progress') && (
-                                                            <span style={{ fontSize: '12px', color: '#666' }}>No actions available</span>
+                                                        {dispatch.status === 'IN_PROGRESS' && (
+                                                            <span style={{ fontSize: '12px', color: '#666', fontStyle: 'italic' }}>In progress...</span>
                                                         )}
                                                     </div>
                                                 </td>
                                             </tr>
-                                        ))}
+                                        ))
+                                        )}
                                     </tbody>
                                 </table>
                             </div>

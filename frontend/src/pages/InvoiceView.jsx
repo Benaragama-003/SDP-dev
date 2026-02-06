@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import Sidebar from '../components/Sidebar';
 import AdminSidebar from '../components/AdminSidebar';
-import { Search, Eye, Download, FileText, Calendar, User, CreditCard } from 'lucide-react';
+import { Search, Eye, Download, Calendar, User, Loader2, AlertCircle } from 'lucide-react';
 import { formatDate } from '../utils/dateUtils';
+import { invoiceApi } from '../services/api';
 import '../styles/Invoice.css';
 
 const InvoiceView = () => {
@@ -12,42 +13,120 @@ const InvoiceView = () => {
     const [filterStatus, setFilterStatus] = useState('all');
     const [selectedInvoice, setSelectedInvoice] = useState(null);
     const [showModal, setShowModal] = useState(false);
+    const [invoices, setInvoices] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
 
-    // Mock invoice data
-    const invoices = [
-        {
-            id: 'INV-001',
-            date: '2026-01-10',
-            dealer: 'ABC Stores',
-            total: 45000,
-            status: 'paid',
-            paymentType: 'Cash',
-            items: [
-                { size: '5kg', type: 'Filled', qty: 10, rate: 1500, amount: 15000 },
-                { size: '12.5kg', type: 'Filled', qty: 5, rate: 3000, amount: 15000 },
-                { size: '5kg', type: 'New', qty: 5, rate: 3000, amount: 15000 }
-            ]
-        },
-        {
-            id: 'INV-002',
-            date: '2026-01-11',
-            dealer: 'XYZ Mart',
-            total: 78000,
-            status: 'pending',
-            paymentType: 'Credit',
-            items: [
-                { size: '12.5kg', type: 'Filled', qty: 26, rate: 3000, amount: 78000 }
-            ]
-        },
-        // ... adding items to others
-    ];
+    useEffect(() => {
+        const fetchInvoices = async () => {
+            try {
+                setLoading(true);
+                const response = await invoiceApi.getAll();
+                setInvoices(response.data.data || []);
+            } catch (err) {
+                console.error('Error fetching invoices:', err);
+                setError(err.response?.data?.message || 'Failed to load invoices');
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchInvoices();
+    }, []);
 
     const filteredInvoices = invoices.filter((invoice) => {
-        const matchesSearch = invoice.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            invoice.dealer.toLowerCase().includes(searchTerm.toLowerCase());
-        const matchesStatus = filterStatus === 'all' || invoice.status === filterStatus;
+        const matchesSearch = 
+            invoice.invoice_id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            invoice.invoice_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            invoice.dealer_name?.toLowerCase().includes(searchTerm.toLowerCase());
+        const totalPaid = parseFloat(invoice.total_paid) || 0;
+        const pendingPaid = parseFloat(invoice.pending_paid) || 0;
+        const totalPayments = totalPaid + pendingPaid;
+        const totalAmount = parseFloat(invoice.total_amount) || 0;
+        const isPaid = totalPaid >= totalAmount;
+        const isPartial = totalPayments > 0 && totalPayments < totalAmount;
+        const matchesStatus = filterStatus === 'all' || 
+            (filterStatus === 'paid' && isPaid) ||
+            (filterStatus === 'pending' && !isPaid);
         return matchesSearch && matchesStatus;
     });
+
+    const getStatusBadge = (invoice) => {
+        const totalPaid = parseFloat(invoice.total_paid) || 0;
+        const pendingPaid = parseFloat(invoice.pending_paid) || 0;
+        const totalPayments = totalPaid + pendingPaid;
+        const creditBalance = parseFloat(invoice.credit_balance) || 0;
+        const totalAmount = parseFloat(invoice.total_amount) || 0;
+        
+        if (totalPaid >= totalAmount) {
+            return { label: 'Paid', class: 'badge-success' };
+        } else if (totalPayments > 0 && creditBalance > 0) {
+            return { label: `Partial (Rs.${totalPayments.toLocaleString()})`, class: 'badge-warning' };
+        } else if (pendingPaid > 0) {
+            return { label: 'Pending', class: 'badge-warning' };
+        } else {
+            return { label: 'Pending', class: 'badge-danger' };
+        }
+    };
+
+    const handleDownloadPDF = async (invoiceId) => {
+        try {
+            const response = await invoiceApi.downloadPDF(invoiceId);
+            // Check if we got a proper blob response
+            if (response.data && response.data.size > 0) {
+                const url = window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `invoice-${invoiceId}.pdf`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                window.URL.revokeObjectURL(url);
+            }
+        } catch (error) {
+            console.error('Error downloading PDF:', error);
+            // Only show error if it's a real error, not a download manager intercept
+            if (error.response) {
+                // Try to read error message from blob
+                try {
+                    const text = await error.response.data?.text?.();
+                    const json = text ? JSON.parse(text) : null;
+                    alert(json?.message || 'Failed to download invoice PDF');
+                } catch {
+                    alert('Failed to download invoice PDF');
+                }
+            }
+        }
+    };
+
+    if (loading) {
+        return (
+            <>
+                {isAdmin ? <AdminSidebar /> : <Sidebar />}
+                <div className="invoice-container">
+                    <main className="invoice-main" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '400px' }}>
+                        <Loader2 size={40} style={{ animation: 'spin 1s linear infinite' }} />
+                    </main>
+                </div>
+            </>
+        );
+    }
+
+    if (error) {
+        return (
+            <>
+                {isAdmin ? <AdminSidebar /> : <Sidebar />}
+                <div className="invoice-container">
+                    <main className="invoice-main">
+                        <div style={{ textAlign: 'center', padding: '60px 20px' }}>
+                            <AlertCircle size={60} color="#dc3545" style={{ marginBottom: '20px' }} />
+                            <h2 style={{ color: '#101540', marginBottom: '10px' }}>Error Loading Invoices</h2>
+                            <p style={{ color: '#666' }}>{error}</p>
+                        </div>
+                    </main>
+                </div>
+            </>
+        );
+    }
 
     return (
         <>
@@ -67,7 +146,7 @@ const InvoiceView = () => {
 
                     <div className="table-container">
                         <div className="table-header">
-                            <h3 className="table-title">All Records</h3>
+                            <h3 className="table-title">All Records ({filteredInvoices.length})</h3>
                             <div className="table-actions">
                                 <select
                                     className="filter-select"
@@ -90,6 +169,12 @@ const InvoiceView = () => {
                                 </div>
                             </div>
                         </div>
+                        
+                        {filteredInvoices.length === 0 ? (
+                            <div style={{ textAlign: 'center', padding: '40px', color: '#666' }}>
+                                {searchTerm || filterStatus !== 'all' ? 'No invoices match your search criteria.' : 'No invoices found.'}
+                            </div>
+                        ) : (
                         <table className="data-table">
                             <thead>
                                 <tr>
@@ -103,16 +188,18 @@ const InvoiceView = () => {
                                 </tr>
                             </thead>
                             <tbody>
-                                {filteredInvoices.map((invoice) => (
-                                    <tr key={invoice.id}>
-                                        <td style={{ fontWeight: '600' }}>{invoice.id}</td>
-                                        <td>{formatDate(invoice.date)}</td>
-                                        <td>{invoice.dealer}</td>
-                                        <td style={{ fontWeight: '500' }}>Rs. {invoice.total.toLocaleString()}</td>
-                                        <td>{invoice.paymentType}</td>
+                                {filteredInvoices.map((invoice) => {
+                                    const status = getStatusBadge(invoice);
+                                    return (
+                                    <tr key={invoice.invoice_id}>
+                                        <td style={{ fontWeight: '600' }}>{invoice.invoice_number || invoice.invoice_id}</td>
+                                        <td>{formatDate(invoice.created_at)}</td>
+                                        <td>{invoice.dealer_name}</td>
+                                        <td style={{ fontWeight: '500' }}>Rs. {parseFloat(invoice.total_amount || 0).toLocaleString()}</td>
+                                        <td>{invoice.payment_type}</td>
                                         <td>
-                                            <span className={`badge ${invoice.status === 'paid' ? 'badge-success' : 'badge-warning'}`}>
-                                                {invoice.status.charAt(0).toUpperCase() + invoice.status.slice(1)}
+                                            <span className={`badge ${status.class}`}>
+                                                {status.label}
                                             </span>
                                         </td>
                                         <td>
@@ -126,20 +213,22 @@ const InvoiceView = () => {
                                             </div>
                                         </td>
                                     </tr>
-                                ))}
+                                    );
+                                })}
                             </tbody>
                         </table>
+                        )}
                     </div>
                 </main>
 
-                {/* Harmonized Invoice View Modal */}
+                {/* Invoice View Modal */}
                 {showModal && selectedInvoice && (
                     <div className="modal-overlay" onClick={() => setShowModal(false)}>
                         <div className="modal-content" onClick={e => e.stopPropagation()} style={{ backgroundColor: '#fff', borderRadius: '25px', maxWidth: '700px', maxHeight: '90vh', padding: '0', boxShadow: '0 20px 45px rgba(0,0,0,0.2)', overflowY: 'auto' }}>
                             <div className="modal-header" style={{ padding: '25px 30px', borderBottom: '1px solid #f0f0f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#fcfcfc' }}>
                                 <div>
                                     <h1 style={{ fontSize: '22px', fontWeight: 'bold', margin: '0', color: '#101540' }}>Invoice Details</h1>
-                                    <p style={{ margin: '5px 0 0 0', fontSize: '14px', color: '#666' }}>Document #: {selectedInvoice.id}</p>
+                                    <p style={{ margin: '5px 0 0 0', fontSize: '14px', color: '#666' }}>Document #: {selectedInvoice.invoice_number || selectedInvoice.invoice_id}</p>
                                 </div>
                                 <button className="modal-close" onClick={() => setShowModal(false)} style={{ fontSize: '28px', border: 'none', background: 'none', cursor: 'pointer', color: '#ccc' }}>×</button>
                             </div>
@@ -151,15 +240,21 @@ const InvoiceView = () => {
                                             <Calendar size={14} />
                                             <span style={{ fontSize: '11px', fontWeight: 'bold', textTransform: 'uppercase' }}>Issued Date</span>
                                         </div>
-                                        <p style={{ margin: '0', fontSize: '16px', fontWeight: '600', color: '#333' }}>{formatDate(selectedInvoice.date)}</p>
+                                        <p style={{ margin: '0', fontSize: '16px', fontWeight: '600', color: '#333' }}>{formatDate(selectedInvoice.created_at)}</p>
                                     </div>
                                     <div>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#999', marginBottom: '8px' }}>
                                             <User size={14} />
                                             <span style={{ fontSize: '11px', fontWeight: 'bold', textTransform: 'uppercase' }}>Dealer Entity</span>
                                         </div>
-                                        <p style={{ margin: '0', fontSize: '16px', fontWeight: '600', color: '#333' }}>{selectedInvoice.dealer}</p>
+                                        <p style={{ margin: '0', fontSize: '16px', fontWeight: '600', color: '#333' }}>{selectedInvoice.dealer_name}</p>
                                     </div>
+                                </div>
+
+                                {/* Dispatch Info */}
+                                <div style={{ marginBottom: '25px', padding: '15px', backgroundColor: '#f0f4ff', borderRadius: '12px' }}>
+                                    <div style={{ fontSize: '12px', color: '#666', marginBottom: '5px' }}>Dispatch Reference</div>
+                                    <div style={{ fontWeight: '600', color: '#101540' }}>{selectedInvoice.dispatch_id}</div>
                                 </div>
 
                                 {/* Purchased Items Section */}
@@ -176,14 +271,22 @@ const InvoiceView = () => {
                                                 </tr>
                                             </thead>
                                             <tbody>
-                                                {selectedInvoice.items?.map((item, idx) => (
-                                                    <tr key={idx} style={{ borderBottom: idx === selectedInvoice.items.length - 1 ? 'none' : '1px solid #f5f5f5' }}>
-                                                        <td style={{ padding: '12px 15px', fontSize: '14px' }}>{item.size} {item.type}</td>
-                                                        <td style={{ padding: '12px 15px', textAlign: 'center', fontSize: '14px', fontWeight: '600' }}>{item.qty}</td>
-                                                        <td style={{ padding: '12px 15px', textAlign: 'right', fontSize: '14px' }}>Rs. {item.rate.toLocaleString()}</td>
-                                                        <td style={{ padding: '12px 15px', textAlign: 'right', fontSize: '14px', fontWeight: '600', color: '#101540' }}>Rs. {item.amount.toLocaleString()}</td>
+                                                {selectedInvoice.items?.length > 0 ? (
+                                                    selectedInvoice.items.map((item, idx) => (
+                                                        <tr key={idx} style={{ borderBottom: idx === selectedInvoice.items.length - 1 ? 'none' : '1px solid #f5f5f5' }}>
+                                                            <td style={{ padding: '12px 15px', fontSize: '14px' }}>{item.cylinder_size || item.product_id} ({item.sale_type})</td>
+                                                            <td style={{ padding: '12px 15px', textAlign: 'center', fontSize: '14px', fontWeight: '600' }}>{item.quantity}</td>
+                                                            <td style={{ padding: '12px 15px', textAlign: 'right', fontSize: '14px' }}>Rs. {parseFloat(item.unit_price || 0).toLocaleString()}</td>
+                                                            <td style={{ padding: '12px 15px', textAlign: 'right', fontSize: '14px', fontWeight: '600', color: '#101540' }}>Rs. {parseFloat(item.total_price || 0).toLocaleString()}</td>
+                                                        </tr>
+                                                    ))
+                                                ) : (
+                                                    <tr>
+                                                        <td colSpan={4} style={{ padding: '20px', textAlign: 'center', color: '#999' }}>
+                                                            Item details not available
+                                                        </td>
                                                     </tr>
-                                                ))}
+                                                )}
                                             </tbody>
                                         </table>
                                     </div>
@@ -193,18 +296,43 @@ const InvoiceView = () => {
                                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '15px' }}>
                                         <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
                                             <span style={{ fontSize: '11px', color: '#9ca3af', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Payment Method</span>
-                                            <span style={{ fontSize: '15px', color: '#111827', fontWeight: '600' }}>{selectedInvoice.paymentType}</span>
+                                            <span style={{ fontSize: '15px', color: '#111827', fontWeight: '600' }}>{selectedInvoice.payment_type}</span>
                                         </div>
                                         <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', alignItems: 'flex-end' }}>
                                             <span style={{ fontSize: '11px', color: '#9ca3af', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Billing Status</span>
-                                            <span className={`badge ${selectedInvoice.status === 'paid' ? 'badge-success' : 'badge-warning'}`} style={{ padding: '6px 12px', fontSize: '12px', fontWeight: 'bold' }}>
-                                                {selectedInvoice.status.toUpperCase()}
+                                            <span className={`badge ${getStatusBadge(selectedInvoice).class}`} style={{ padding: '6px 12px', fontSize: '12px', fontWeight: 'bold' }}>
+                                                {getStatusBadge(selectedInvoice).label.toUpperCase()}
                                             </span>
                                         </div>
                                     </div>
-                                    <div style={{ borderTop: '2px dashed #e5e7eb', paddingTop: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                        <span style={{ fontSize: '18px', fontWeight: 'bold', color: '#374151' }}>Grand Total</span>
-                                        <span style={{ fontSize: '26px', fontWeight: '800', color: '#101540' }}>Rs. {selectedInvoice.total.toLocaleString()}</span>
+                                    <div style={{ borderTop: '2px dashed #e5e7eb', paddingTop: '20px' }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                                            <span style={{ fontSize: '18px', fontWeight: 'bold', color: '#374151' }}>Grand Total</span>
+                                            <span style={{ fontSize: '26px', fontWeight: '800', color: '#101540' }}>Rs. {parseFloat(selectedInvoice.total_amount || 0).toLocaleString()}</span>
+                                        </div>
+                                        {/* Payment Breakdown */}
+                                        {(parseFloat(selectedInvoice.total_paid) > 0 || parseFloat(selectedInvoice.pending_paid) > 0 || parseFloat(selectedInvoice.credit_balance) > 0) && (
+                                            <div style={{ borderTop: '1px solid #e5e7eb', marginTop: '10px', paddingTop: '10px', fontSize: '14px' }}>
+                                                {parseFloat(selectedInvoice.total_paid) > 0 && (
+                                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px' }}>
+                                                        <span style={{ color: '#28a745' }}>Paid (Cleared)</span>
+                                                        <span style={{ color: '#28a745', fontWeight: '600' }}>Rs. {parseFloat(selectedInvoice.total_paid).toLocaleString()}</span>
+                                                    </div>
+                                                )}
+                                                {parseFloat(selectedInvoice.pending_paid) > 0 && (
+                                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px' }}>
+                                                        <span style={{ color: '#ffc107' }}>Cheque Pending</span>
+                                                        <span style={{ color: '#ffc107', fontWeight: '600' }}>Rs. {parseFloat(selectedInvoice.pending_paid).toLocaleString()}</span>
+                                                    </div>
+                                                )}
+                                                {parseFloat(selectedInvoice.credit_balance) > 0 && (
+                                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px' }}>
+                                                        <span style={{ color: '#dc3545' }}>Credit Balance</span>
+                                                        <span style={{ color: '#dc3545', fontWeight: '600' }}>Rs. {parseFloat(selectedInvoice.credit_balance).toLocaleString()}</span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
 
@@ -247,6 +375,7 @@ const InvoiceView = () => {
                                             boxShadow: '0 5px 15px rgba(191, 191, 42, 0.2)',
                                             transition: 'all 0.2s ease'
                                         }}
+                                        onClick={() => handleDownloadPDF(selectedInvoice.invoice_id)}
                                     >
                                         <Download size={20} /> Download PDF
                                     </button>

@@ -552,6 +552,121 @@ const exportInventoryToExcel = async (req, res, next) => {
             { width: 15 }, { width: 20 }, { width: 12 }, { width: 12 }, { width: 15 }
         ];
 
+        // ===== SHEET 3: Empty Stock Analysis =====
+        const emptySheet = workbook.addWorksheet('Empty Stock Analysis');
+
+        // Company Header
+        companyHeaders.forEach((text, idx) => {
+            emptySheet.mergeCells(`A${idx + 1}:G${idx + 1}`);
+            const row = emptySheet.getRow(idx + 1);
+            row.getCell(1).value = text;
+            row.getCell(1).alignment = { horizontal: 'center' };
+            row.getCell(1).font = idx === 0 ? { bold: true, size: 14 } : { size: 11 };
+        });
+
+        // Summary section
+        emptySheet.getRow(6).getCell(1).value = 'Empty Stock Summary';
+        emptySheet.getRow(6).getCell(1).font = { bold: true, size: 12 };
+
+        // Table headers at row 7
+        emptySheet.getRow(7).values = ['Cylinder Size', 'Product Code', 'Current Empty', 'Current Filled', 'Exchange Ratio', 'Status', 'Notes'];
+        emptySheet.getRow(7).eachCell(cell => {
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E3A5F' } };
+            cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+            cell.alignment = { horizontal: 'center' };
+        });
+
+        // Data rows with empty stock insights
+        inventory.forEach((item, idx) => {
+            const row = emptySheet.getRow(8 + idx);
+            const ratio = item.filled > 0 ? (item.empty / item.filled * 100).toFixed(1) : 'N/A';
+            const status = item.empty < 50 ? 'LOW' : item.empty < 100 ? 'MODERATE' : 'GOOD';
+            const notes = item.empty < 50 
+                ? 'May need to collect empties or limit refill orders' 
+                : item.empty < item.filled 
+                    ? 'Sufficient for current refill capacity' 
+                    : 'Good empty stock for exchanges';
+            
+            row.values = [
+                item.cylinder_size,
+                item.product_code,
+                item.empty,
+                item.filled,
+                ratio + '%',
+                status,
+                notes
+            ];
+            row.eachCell((cell, colNumber) => {
+                cell.border = {
+                    top: { style: 'thin' },
+                    bottom: { style: 'thin' },
+                    left: { style: 'thin' },
+                    right: { style: 'thin' }
+                };
+                // Color code status column
+                if (colNumber === 6) {
+                    const statusColors = {
+                        'LOW': 'FFDC2626',
+                        'MODERATE': 'FFD97706',
+                        'GOOD': 'FF16A34A'
+                    };
+                    cell.font = { bold: true, color: { argb: statusColors[status] || 'FF000000' } };
+                }
+            });
+        });
+
+        // Empty movements summary section
+        let emptyMovRow = 9 + inventory.length;
+        emptySheet.getRow(emptyMovRow).getCell(1).value = 'Recent Empty Stock Movements';
+        emptySheet.getRow(emptyMovRow).getCell(1).font = { bold: true, size: 12 };
+        emptyMovRow++;
+
+        // Filter only EMPTY type movements
+        const emptyMovements = movements.filter(m => m.product_type === 'EMPTY');
+        
+        if (emptyMovements.length > 0) {
+            emptySheet.getRow(emptyMovRow).values = ['Date', 'Cylinder Size', 'Movement Type', 'Change', 'Before', 'After', 'Reference'];
+            emptySheet.getRow(emptyMovRow).eachCell(cell => {
+                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF6B21A8' } };
+                cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+                cell.alignment = { horizontal: 'center' };
+            });
+            emptyMovRow++;
+
+            emptyMovements.slice(0, 50).forEach(mov => {  // Limit to 50 recent movements
+                const row = emptySheet.getRow(emptyMovRow);
+                const changeText = mov.quantity_change > 0 ? `+${mov.quantity_change}` : `${mov.quantity_change}`;
+                row.values = [
+                    new Date(mov.created_at).toLocaleDateString(),
+                    mov.cylinder_size,
+                    mov.movement_type.replace(/_/g, ' '),
+                    changeText,
+                    mov.quantity_before,
+                    mov.quantity_after,
+                    mov.reference_id || '-'
+                ];
+                row.eachCell((cell, colNumber) => {
+                    cell.border = {
+                        top: { style: 'thin' },
+                        bottom: { style: 'thin' },
+                        left: { style: 'thin' },
+                        right: { style: 'thin' }
+                    };
+                    if (colNumber === 4) {
+                        cell.font = { color: { argb: mov.quantity_change > 0 ? 'FF16A34A' : 'FFDC2626' }, bold: true };
+                    }
+                });
+                emptyMovRow++;
+            });
+        } else {
+            emptySheet.getRow(emptyMovRow).getCell(1).value = 'No empty stock movements found for the selected period';
+            emptySheet.getRow(emptyMovRow).getCell(1).font = { italic: true, color: { argb: 'FF666666' } };
+        }
+
+        emptySheet.columns = [
+            { width: 12 }, { width: 14 }, { width: 20 }, { width: 10 }, { width: 10 }, { width: 10 }, { width: 35 }
+        ];
+
         // Send file
         const fileName = `inventory_report_${new Date().toISOString().split('T')[0]}.xlsx`;
         res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');

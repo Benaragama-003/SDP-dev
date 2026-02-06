@@ -1,74 +1,133 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Sidebar from '../components/Sidebar';
-import { Search, Eye } from 'lucide-react';
+import { Search, Eye, RefreshCw, Truck, Package } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { formatDate } from '../utils/dateUtils';
+import { dispatchApi } from '../services/api';
 import '../styles/Dispatch.css';
 
 const SupervisorDispatchView = () => {
     const { user } = useAuth();
     const [searchTerm, setSearchTerm] = useState('');
-
-    const [dispatches, setDispatches] = useState([
-        {
-            id: 'D001',
-            date: new Date().toISOString().split('T')[0],
-            lorry: 'CAA-1234',
-            supervisor: user?.name || 'Chamika Denuwan',
-            route: 'Route A',
-            status: 'in-progress',
-            progress: {
-                '2kg': { loaded: 50, sold: 20, damage: 0, balance: 30 },
-                '5kg': { loaded: 110, sold: 50, damage: 0, balance: 60 },
-                '12.5kg': { loaded: 140, sold: 100, damage: 0, balance: 40 },
-                '37.5kg': { loaded: 0, sold: 0, damage: 0, balance: 0 }
-            }
-        },
-        {
-            id: 'D002',
-            date: new Date().toISOString().split('T')[0],
-            lorry: 'CAB-5678',
-            supervisor: user?.name || 'Nethindu Chandula',
-            route: 'Route B',
-            status: 'scheduled',
-            progress: {
-                '2kg': { loaded: 100, sold: 0, damage: 0, balance: 100 },
-                '5kg': { loaded: 80, sold: 0, damage: 0, balance: 80 },
-                '12.5kg': { loaded: 150, sold: 0, damage: 0, balance: 150 },
-                '37.5kg': { loaded: 10, sold: 0, damage: 0, balance: 10 }
-            }
-        }
-    ]);
-
-    const handleStartDispatch = (dispatchId) => {
-        setDispatches(prev => prev.map(d =>
-            d.id === dispatchId ? { ...d, status: 'in-progress' } : d
-        ));
-        alert("Trip started! Status updated to 'In Progress'.");
-    };
-
+    const [dispatches, setDispatches] = useState([]);
+    const [activeDispatch, setActiveDispatch] = useState(null);
+    const [loading, setLoading] = useState(true);
     const [selectedDispatch, setSelectedDispatch] = useState(null);
     const [showProgressModal, setShowProgressModal] = useState(false);
     const [isConfirmingCompletion, setIsConfirmingCompletion] = useState(false);
+    const [dispatchDetails, setDispatchDetails] = useState(null);
+    const [loadingDetails, setLoadingDetails] = useState(false);
+    const [updating, setUpdating] = useState(false);
+    const [editedItems, setEditedItems] = useState([]);
 
-    const filtered = dispatches.filter(d =>
-        d.id.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    useEffect(() => {
+        fetchData();
+    }, []);
 
-    const handleMarkComplete = (dispatch) => {
+    const fetchData = async () => {
+        setLoading(true);
+        try {
+            // Fetch supervisor's dispatches and active dispatch
+            const [dispatchesRes, activeRes] = await Promise.all([
+                dispatchApi.getAll({ supervisor_id: user?.user_id }),
+                dispatchApi.getMyDispatch().catch(() => ({ data: { data: null } }))
+            ]);
+            
+            setDispatches(dispatchesRes.data.data.dispatches || []);
+            setActiveDispatch(activeRes.data.data);
+        } catch (error) {
+            console.error('Failed to fetch dispatches:', error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const fetchDispatchDetails = async (dispatchId) => {
+        setLoadingDetails(true);
+        try {
+            const response = await dispatchApi.getById(dispatchId);
+            const details = response.data.data;
+            setDispatchDetails(details);
+            // Initialize editable items
+            setEditedItems(details.items.map(item => ({
+                product_id: item.product_id,
+                sold_filled: item.sold_filled || 0,
+                sold_new: item.sold_new || 0,
+                empty_collected: item.empty_collected || 0,
+                damaged_quantity: item.damaged_quantity || 0,
+                loaded_quantity: item.loaded_quantity,
+                size: item.size,
+                type: item.type
+            })));
+        } catch (error) {
+            console.error('Failed to fetch dispatch details:', error);
+            alert('Failed to load dispatch details');
+        } finally {
+            setLoadingDetails(false);
+        }
+    };
+
+    const handleStartDispatch = async (dispatchId) => {
+        if (!window.confirm('Are you sure you want to start this dispatch?')) return;
+        
+        try {
+            await dispatchApi.start(dispatchId);
+            alert("Trip started! Status updated to 'In Progress'.");
+            fetchData();
+        } catch (error) {
+            console.error('Failed to start dispatch:', error);
+            alert(error.response?.data?.message || 'Failed to start dispatch');
+        }
+    };
+
+    const handleViewProgress = async (dispatch) => {
+        setSelectedDispatch(dispatch);
+        setIsConfirmingCompletion(false);
+        setShowProgressModal(true);
+        await fetchDispatchDetails(dispatch.dispatch_id);
+    };
+
+    const handleMarkComplete = async (dispatch) => {
         setSelectedDispatch(dispatch);
         setIsConfirmingCompletion(true);
         setShowProgressModal(true);
+        await fetchDispatchDetails(dispatch.dispatch_id);
     };
 
-    const confirmCompletion = () => {
-        setDispatches(prev => prev.map(d =>
-            d.id === selectedDispatch.id ? { ...d, status: 'awaiting-unload' } : d
-        ));
-        setShowProgressModal(false);
-        setIsConfirmingCompletion(false);
-        alert('Dispatch operation marked as completed successfully!');
+    const confirmCompletion = async () => {
+        if (!window.confirm('Are you sure you want to complete this trip? The remaining balance will be returned to warehouse.')) return;
+        
+        setUpdating(true);
+        try {
+            // Request unload - sold/damaged quantities are already tracked via invoices/damage reports
+            await dispatchApi.requestUnload(selectedDispatch.dispatch_id);
+            
+            alert('Dispatch completed! Waiting for admin to accept unload.');
+            setShowProgressModal(false);
+            setIsConfirmingCompletion(false);
+            fetchData();
+        } catch (error) {
+            console.error('Failed to complete dispatch:', error);
+            alert(error.response?.data?.message || 'Failed to complete dispatch');
+        } finally {
+            setUpdating(false);
+        }
     };
+
+    const getStatusBadgeClass = (status) => {
+        switch (status) {
+            case 'SCHEDULED': return 'badge-secondary';
+            case 'IN_PROGRESS': return 'badge-warning';
+            case 'AWAITING_UNLOAD': return 'badge-info';
+            case 'UNLOADED': return 'badge-success';
+            case 'CANCELLED': return 'badge-danger';
+            default: return 'badge-secondary';
+        }
+    };
+
+    const filtered = dispatches.filter(d =>
+        d.dispatch_id?.toLowerCase().includes(searchTerm.toLowerCase())
+    );
 
     return (
         <>
@@ -77,14 +136,71 @@ const SupervisorDispatchView = () => {
                 <main className="dispatch-main">
                     <div className="page-header">
                         <div>
-                            <h1 className="page-title">My Dispatch History</h1>
-                            <p className="page-subtitle">Monitor my recent dispatch operations and progress</p>
+                            <h1 className="page-title">My Dispatches</h1>
+                            <p className="page-subtitle">Monitor and manage your dispatch operations</p>
                         </div>
+                        <button
+                            onClick={fetchData}
+                            style={{ padding: '10px 20px', borderRadius: '8px', border: '1px solid #ddd', background: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}
+                        >
+                            <RefreshCw size={16} /> Refresh
+                        </button>
                     </div>
+
+                    {/* Active Dispatch Card */}
+                    {activeDispatch && (
+                        <div style={{ backgroundColor: '#e3f2fd', padding: '20px', borderRadius: '15px', marginBottom: '25px', border: '2px solid #1976d2' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+                                <div>
+                                    <h3 style={{ margin: 0, color: '#1976d2', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                        <Truck size={24} /> Active Dispatch
+                                    </h3>
+                                    <p style={{ margin: '5px 0 0', color: '#666' }}>{activeDispatch.dispatch_id}</p>
+                                </div>
+                                <span className={`badge ${getStatusBadgeClass(activeDispatch.status)}`} style={{ fontSize: '14px', padding: '8px 15px' }}>
+                                    {activeDispatch.status.replace('_', ' ')}
+                                </span>
+                            </div>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '15px', marginBottom: '15px' }}>
+                                <div><strong>Lorry:</strong> {activeDispatch.plate_number}</div>
+                                <div><strong>Route:</strong> {activeDispatch.route}</div>
+                                <div><strong>Date:</strong> {formatDate(activeDispatch.dispatch_date)}</div>
+                            </div>
+                            <div style={{ display: 'flex', gap: '10px' }}>
+                                {activeDispatch.status === 'SCHEDULED' && (
+                                    <button
+                                        onClick={() => handleStartDispatch(activeDispatch.dispatch_id)}
+                                        style={{ backgroundColor: '#28a745', color: 'white', border: 'none', padding: '10px 20px', borderRadius: '8px', cursor: 'pointer', fontWeight: '600' }}
+                                    >
+                                        Start Dispatch
+                                    </button>
+                                )}
+                                {activeDispatch.status === 'IN_PROGRESS' && (
+                                    <>
+                                        <button
+                                            onClick={() => handleViewProgress(activeDispatch)}
+                                            style={{ backgroundColor: '#101540', color: 'white', border: 'none', padding: '10px 20px', borderRadius: '8px', cursor: 'pointer', fontWeight: '600' }}
+                                        >
+                                            View Progress
+                                        </button>
+                                        <button
+                                            onClick={() => handleMarkComplete(activeDispatch)}
+                                            style={{ backgroundColor: '#ffc107', color: '#101540', border: 'none', padding: '10px 20px', borderRadius: '8px', cursor: 'pointer', fontWeight: '600' }}
+                                        >
+                                            Complete Trip
+                                        </button>
+                                    </>
+                                )}
+                                {activeDispatch.status === 'AWAITING_UNLOAD' && (
+                                    <span style={{ color: '#666', fontStyle: 'italic' }}>Waiting for admin to accept unload...</span>
+                                )}
+                            </div>
+                        </div>
+                    )}
 
                     <div className="table-container">
                         <div className="table-header">
-                            <h3 className="table-title">Recent Dispatches</h3>
+                            <h3 className="table-title">Dispatch History</h3>
                             <div className="search-box">
                                 <Search className="search-icon" size={20} />
                                 <input
@@ -96,6 +212,10 @@ const SupervisorDispatchView = () => {
                                 />
                             </div>
                         </div>
+                        
+                        {loading ? (
+                            <div style={{ textAlign: 'center', padding: '50px' }}>Loading dispatches...</div>
+                        ) : (
                         <div className="table-responsive">
                             <table className="data-table">
                                 <thead>
@@ -109,18 +229,22 @@ const SupervisorDispatchView = () => {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {filtered.map((dispatch) => (
-                                        <tr key={dispatch.id}>
-                                            <td style={{ fontWeight: '600' }}>{dispatch.id}</td>
-                                            <td>{formatDate(dispatch.date)}</td>
-                                            <td>{dispatch.lorry}</td>
+                                    {filtered.length === 0 ? (
+                                        <tr>
+                                            <td colSpan="6" style={{ textAlign: 'center', padding: '30px', color: '#666' }}>
+                                                No dispatches found
+                                            </td>
+                                        </tr>
+                                    ) : (
+                                    filtered.map((dispatch) => (
+                                        <tr key={dispatch.dispatch_id}>
+                                            <td style={{ fontWeight: '600' }}>{dispatch.dispatch_id}</td>
+                                            <td>{formatDate(dispatch.dispatch_date)}</td>
+                                            <td>{dispatch.plate_number}</td>
                                             <td>{dispatch.route}</td>
                                             <td>
-                                                <span className={`badge ${dispatch.status === 'unloaded' ? 'badge-success' :
-                                                    dispatch.status === 'awaiting-unload' ? 'badge-info' :
-                                                        dispatch.status === 'in-progress' ? 'badge-warning' : 'badge-secondary'
-                                                    }`}>
-                                                    {dispatch.status.replace('-', ' ')}
+                                                <span className={`badge ${getStatusBadgeClass(dispatch.status)}`}>
+                                                    {dispatch.status.replace('_', ' ')}
                                                 </span>
                                             </td>
                                             <td>
@@ -128,124 +252,150 @@ const SupervisorDispatchView = () => {
                                                     <button
                                                         className="btn btn-sm"
                                                         style={{ backgroundColor: '#101540', color: 'white', display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', borderRadius: '8px', fontSize: '13px', fontWeight: '500' }}
-                                                        onClick={() => { setSelectedDispatch(dispatch); setIsConfirmingCompletion(false); setShowProgressModal(true); }}
+                                                        onClick={() => handleViewProgress(dispatch)}
                                                     >
-                                                        <Eye size={14} /> View Progress
+                                                        <Eye size={14} /> View
                                                     </button>
-
-                                                    {dispatch.status === 'scheduled' && (
-                                                        <button
-                                                            className="btn btn-sm"
-                                                            style={{ backgroundColor: '#101540', color: 'white', display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', borderRadius: '8px', fontSize: '13px', fontWeight: '600' }}
-                                                            onClick={() => handleStartDispatch(dispatch.id)}
-                                                        >
-                                                            Start Dispatch
-                                                        </button>
-                                                    )}
-
-                                                    {dispatch.status === 'in-progress' && (
-                                                        <button
-                                                            className="btn btn-sm"
-                                                            style={{ backgroundColor: '#e2e221', color: '#101540', display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', borderRadius: '8px', fontSize: '13px', fontWeight: '600' }}
-                                                            onClick={() => handleMarkComplete(dispatch)}
-                                                        >
-                                                            Complete Trip
-                                                        </button>
-                                                    )}
-
-                                                    {dispatch.status === 'awaiting-unload' && (
-                                                        <span style={{ fontSize: '12px', color: '#666', fontStyle: 'italic' }}>Pending Admin Unload</span>
-                                                    )}
                                                 </div>
                                             </td>
                                         </tr>
-                                    ))}
+                                    ))
+                                    )}
                                 </tbody>
                             </table>
                         </div>
+                        )}
                     </div>
                 </main>
 
                 {showProgressModal && selectedDispatch && (
-                    <div className="modal-overlay" onClick={() => { setShowProgressModal(false); setIsConfirmingCompletion(false); }}>
-                        <div className="modal-content" style={{ backgroundColor: '#fff', borderRadius: '25px', maxWidth: '600px', padding: '0', overflow: 'hidden', boxShadow: '0 20px 40px rgba(0,0,0,0.2)' }} onClick={e => e.stopPropagation()}>
+                    <div className="modal-overlay" onClick={() => { setShowProgressModal(false); setIsConfirmingCompletion(false); setDispatchDetails(null); }}>
+                        <div className="modal-content" style={{ backgroundColor: '#fff', borderRadius: '25px', maxWidth: '700px', padding: '0', overflow: 'hidden', boxShadow: '0 20px 40px rgba(0,0,0,0.2)' }} onClick={e => e.stopPropagation()}>
                             <div className="modal-header" style={{ padding: '25px 30px', borderBottom: '1px solid #f0f0f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                 <div>
                                     <h1 style={{ fontSize: '22px', fontWeight: 'bold', margin: '0', color: '#101540' }}>
-                                        {isConfirmingCompletion ? 'Confirm Completion' : 'Dispatch Progress'}
+                                        {isConfirmingCompletion ? 'Complete Trip' : 'Dispatch Progress'}
                                     </h1>
-                                    <p style={{ margin: '5px 0 0 0', fontSize: '14px', color: '#666' }}>{selectedDispatch.lorry} • {selectedDispatch.route}</p>
+                                    <p style={{ margin: '5px 0 0 0', fontSize: '14px', color: '#666' }}>
+                                        {selectedDispatch.plate_number} • {selectedDispatch.route}
+                                    </p>
                                 </div>
-                                <button className="modal-close" onClick={() => { setShowProgressModal(false); setIsConfirmingCompletion(false); }} style={{ fontSize: '28px', border: 'none', background: 'none', cursor: 'pointer', color: '#ccc' }}>×</button>
+                                <button className="modal-close" onClick={() => { setShowProgressModal(false); setIsConfirmingCompletion(false); setDispatchDetails(null); }} style={{ fontSize: '28px', border: 'none', background: 'none', cursor: 'pointer', color: '#ccc' }}>×</button>
                             </div>
 
                             <div style={{ padding: '30px' }}>
+                                {loadingDetails ? (
+                                    <div style={{ textAlign: 'center', padding: '30px' }}>Loading...</div>
+                                ) : dispatchDetails ? (
+                                    <>
                                 {isConfirmingCompletion && (
                                     <div style={{ backgroundColor: '#fff8e1', padding: '15px', borderRadius: '12px', marginBottom: '25px', display: 'flex', alignItems: 'center', gap: '15px', border: '1px solid #ffe082' }}>
                                         <div style={{ fontSize: '24px' }}>⚠️</div>
                                         <div>
                                             <p style={{ margin: '0', fontWeight: 'bold', color: '#856404' }}>Review before finalizing</p>
-                                            <p style={{ margin: '0', fontSize: '13px', color: '#856404' }}>Once marked as completed, you won't be able to edit this dispatch status.</p>
+                                            <p style={{ margin: '0', fontSize: '13px', color: '#856404' }}>Verify the sold and damaged quantities before completing the trip.</p>
                                         </div>
                                     </div>
                                 )}
 
-                                <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr 1fr 1fr 1fr', gap: '15px', padding: '0 0 15px', borderBottom: '2px solid #f5f5f5', marginBottom: '20px', textAlign: 'center', color: '#999', fontSize: '13px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '1px' }}>
-                                    <div></div>
-                                    <div>2kg</div>
-                                    <div>5kg</div>
-                                    <div>12.5kg</div>
-                                    <div>37.5kg</div>
-                                </div>
+                                {/* Read-only Items Table - quantities updated via invoices/damage reports */}
+                                <table className="data-table" style={{ marginBottom: '20px' }}>
+                                    <thead>
+                                        <tr>
+                                            <th>Product</th>
+                                            <th style={{ textAlign: 'center' }}>Loaded</th>
+                                            <th style={{ textAlign: 'center' }}>Refill</th>
+                                            <th style={{ textAlign: 'center' }}>New</th>
+                                            <th style={{ textAlign: 'center' }}>Empty</th>
+                                            <th style={{ textAlign: 'center' }}>Damaged</th>
+                                            <th style={{ textAlign: 'center' }}>Balance</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {editedItems.map((item, idx) => {
+                                            const totalSold = (item.sold_filled || 0) + (item.sold_new || 0);
+                                            const balance = item.loaded_quantity - totalSold - item.damaged_quantity;
+                                            return (
+                                                <tr key={idx}>
+                                                    <td style={{ fontWeight: '600' }}>{item.size} - {item.type}</td>
+                                                    <td style={{ textAlign: 'center' }}>{item.loaded_quantity}</td>
+                                                    <td style={{ textAlign: 'center' }}>
+                                                        <span style={{ color: '#28a745', fontWeight: '600' }}>{item.sold_filled || 0}</span>
+                                                    </td>
+                                                    <td style={{ textAlign: 'center' }}>
+                                                        <span style={{ color: '#1976d2', fontWeight: '600' }}>{item.sold_new || 0}</span>
+                                                    </td>
+                                                    <td style={{ textAlign: 'center' }}>
+                                                        <span style={{ color: '#ff9800', fontWeight: '600' }}>{item.empty_collected || 0}</span>
+                                                    </td>
+                                                    <td style={{ textAlign: 'center' }}>
+                                                        <span style={{ color: item.damaged_quantity > 0 ? '#dc3545' : '#666', fontWeight: '600' }}>{item.damaged_quantity}</span>
+                                                    </td>
+                                                    <td style={{ textAlign: 'center', fontWeight: '600', color: '#101540', backgroundColor: '#f0f4ff' }}>{balance}</td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
 
-                                {['loaded', 'sold', 'damage', 'balance'].map((type) => (
-                                    <div key={type} style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr 1fr 1fr 1fr', gap: '15px', alignItems: 'center', marginBottom: '15px' }}>
-                                        <div style={{ color: '#333', fontSize: '15px', fontWeight: '600', textAlign: 'right', paddingRight: '15px' }}>
-                                            {type.charAt(0).toUpperCase() + type.slice(1)} Qty
+                                {/* Totals Summary */}
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '8px', marginTop: '15px' }}>
+                                    <div style={{ padding: '10px', backgroundColor: '#e3f2fd', borderRadius: '10px', textAlign: 'center' }}>
+                                        <div style={{ fontSize: '10px', color: '#666' }}>Loaded</div>
+                                        <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#1976d2' }}>
+                                            {editedItems.reduce((sum, i) => sum + i.loaded_quantity, 0)}
                                         </div>
-                                        {['2kg', '5kg', '12.5kg', '37.5kg'].map((size) => (
-                                            <div key={size} style={{
-                                                backgroundColor: type === 'balance' ? '#f0f4ff' : type === 'damage' ? '#fff5f5' : '#fff',
-                                                padding: '12px',
-                                                borderRadius: '12px',
-                                                textAlign: 'center',
-                                                fontSize: '16px',
-                                                fontWeight: '600',
-                                                color: type === 'balance' ? '#101540' : type === 'damage' ? '#dc3545' : '#555',
-                                                border: '1px solid #eee'
-                                            }}>
-                                                {type === 'damage' ? (
-                                                    <input
-                                                        type="number"
-                                                        defaultValue={selectedDispatch.progress[size][type]}
-                                                        style={{ width: '100%', border: 'none', background: 'transparent', textAlign: 'center', fontWeight: 'inherit', color: 'inherit' }}
-                                                        onBlur={(e) => {
-                                                            const val = parseInt(e.target.value) || 0;
-                                                            // Logic for damage replacement: balance = loaded - sold - damage (but replacement means sold stays same?)
-                                                            // Actually, user said: "if a damage was found... he should replace that to a filled one... thats why"
-                                                            // So if 1 damage is found, it's 1 cylinder removed from 'loaded' but replaced (so net loaded unchanged, but damage logged).
-                                                            console.log(`Damage for ${size} updated to ${val}`);
-                                                        }}
-                                                    />
-                                                ) : selectedDispatch.progress[size][type]}
-                                            </div>
-                                        ))}
                                     </div>
-                                ))}
+                                    <div style={{ padding: '10px', backgroundColor: '#e8f5e9', borderRadius: '10px', textAlign: 'center' }}>
+                                        <div style={{ fontSize: '10px', color: '#666' }}>Refill</div>
+                                        <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#388e3c' }}>
+                                            {editedItems.reduce((sum, i) => sum + parseInt(i.sold_filled || 0), 0)}
+                                        </div>
+                                    </div>
+                                    <div style={{ padding: '10px', backgroundColor: '#e3f2fd', borderRadius: '10px', textAlign: 'center' }}>
+                                        <div style={{ fontSize: '10px', color: '#666' }}>New</div>
+                                        <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#1976d2' }}>
+                                            {editedItems.reduce((sum, i) => sum + parseInt(i.sold_new || 0), 0)}
+                                        </div>
+                                    </div>
+                                    <div style={{ padding: '10px', backgroundColor: '#fff3e0', borderRadius: '10px', textAlign: 'center' }}>
+                                        <div style={{ fontSize: '10px', color: '#666' }}>Empty</div>
+                                        <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#ff9800' }}>
+                                            {editedItems.reduce((sum, i) => sum + parseInt(i.empty_collected || 0), 0)}
+                                        </div>
+                                    </div>
+                                    <div style={{ padding: '10px', backgroundColor: '#ffebee', borderRadius: '10px', textAlign: 'center' }}>
+                                        <div style={{ fontSize: '10px', color: '#666' }}>Damaged</div>
+                                        <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#d32f2f' }}>
+                                            {editedItems.reduce((sum, i) => sum + parseInt(i.damaged_quantity || 0), 0)}
+                                        </div>
+                                    </div>
+                                    <div style={{ padding: '10px', backgroundColor: '#f3e5f5', borderRadius: '10px', textAlign: 'center' }}>
+                                        <div style={{ fontSize: '10px', color: '#666' }}>Balance</div>
+                                        <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#7b1fa2' }}>
+                                            {editedItems.reduce((sum, i) => sum + (i.loaded_quantity - parseInt(i.sold_filled || 0) - parseInt(i.sold_new || 0) - parseInt(i.damaged_quantity || 0)), 0)}
+                                        </div>
+                                    </div>
+                                </div>
+                                    </>
+                                ) : (
+                                    <div style={{ textAlign: 'center', padding: '30px', color: '#666' }}>No details available</div>
+                                )}
 
-                                <div style={{ marginTop: '20px', display: 'flex', gap: '15px' }}>
+                                <div style={{ marginTop: '25px', display: 'flex', gap: '15px' }}>
                                     <button
-                                        onClick={() => { setShowProgressModal(false); setIsConfirmingCompletion(false); }}
-                                        style={{ flex: 1, backgroundColor: '#dc3545', border: 'none', padding: '12px', borderRadius: '15px', fontSize: '16px', color: 'white', cursor: 'pointer', fontWeight: '500' }}
+                                        onClick={() => { setShowProgressModal(false); setIsConfirmingCompletion(false); setDispatchDetails(null); }}
+                                        style={{ flex: 1, backgroundColor: '#6c757d', border: 'none', padding: '12px', borderRadius: '15px', fontSize: '16px', color: 'white', cursor: 'pointer', fontWeight: '500' }}
                                     >
-                                        {isConfirmingCompletion ? 'Cancel' : 'Close'}
+                                        Close
                                     </button>
                                     {isConfirmingCompletion && (
                                         <button
                                             onClick={confirmCompletion}
-                                            style={{ flex: 1, backgroundColor: '#e2e221', border: 'none', padding: '12px', borderRadius: '15px', fontSize: '16px', color: '#101540', cursor: 'pointer', fontWeight: '500' }}
+                                            disabled={updating}
+                                            style={{ flex: 1, backgroundColor: '#ffc107', border: 'none', padding: '12px', borderRadius: '15px', fontSize: '16px', color: '#101540', cursor: 'pointer', fontWeight: '600' }}
                                         >
-                                            Confirm & Finish
+                                            {updating ? 'Processing...' : 'Confirm & Finish Trip'}
                                         </button>
                                     )}
                                 </div>

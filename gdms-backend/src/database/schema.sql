@@ -84,13 +84,10 @@ CREATE TABLE dealers (
 CREATE TABLE products (
     product_id VARCHAR(20) PRIMARY KEY,
     product_code VARCHAR(10) UNIQUE NOT NULL COMMENT 'e.g., CYL-5KG, CYL-12KG',
-    cylinder_size VARCHAR(20) NOT NULL COMMENT 'e.g., 2kg, 5kg, 12.5kg, 37.5kg',
-    description VARCHAR(255),
-    
+    cylinder_size VARCHAR(20) NOT NULL COMMENT 'e.g., 2kg, 5kg, 12.5kg, 37.5kg',  
     -- Purchase prices (from supplier)
     filled_purchase_price DECIMAL(10,2) NOT NULL DEFAULT 0.00 COMMENT 'Price to buy filled cylinder (refill) from supplier',
     new_purchase_price DECIMAL(10,2) NOT NULL DEFAULT 0.00 COMMENT 'Price to buy brand new cylinder from supplier',
-    
     -- Selling prices (to dealer/customer)
     filled_selling_price DECIMAL(10,2) NOT NULL DEFAULT 0.00 COMMENT 'Price for gas refill (exchange sale)',
     new_selling_price DECIMAL(10,2) NOT NULL DEFAULT 0.00 COMMENT 'Price for new cylinder (first-time sale)',
@@ -176,10 +173,12 @@ CREATE TABLE dispatch_items (
     product_id VARCHAR(20) NOT NULL,
     product_type ENUM('FILLED', 'EMPTY') NOT NULL,
     allocated_quantity INT NOT NULL COMMENT 'Initial quantity loaded',
-    sold_quantity INT DEFAULT 0 COMMENT 'Total sold',
+    sold_filled INT DEFAULT 0 COMMENT 'Total filled cylinders sold (exchange)',
+    sold_new INT DEFAULT 0 COMMENT 'Total new cylinders sold',
+    empty_collected INT DEFAULT 0 COMMENT 'Total empty cylinders collected',
     damaged_quantity INT DEFAULT 0 COMMENT 'Total damaged (links to damage_inventory)',
-    returned_quantity INT GENERATED ALWAYS AS (allocated_quantity - sold_quantity - damaged_quantity) STORED,
-    FOREIGN KEY (dispatch_id) REFERENCES dispatches(dispatch_id) ON DELETE CASCADE,
+    returned_quantity INT GENERATED ALWAYS AS (allocated_quantity - sold_filled - sold_new - damaged_quantity) STORED,
+	FOREIGN KEY (dispatch_id) REFERENCES dispatches(dispatch_id) ON DELETE CASCADE,
     FOREIGN KEY (product_id) REFERENCES products(product_id),
     INDEX idx_dispatch (dispatch_id),
     INDEX idx_product (product_id)
@@ -209,7 +208,7 @@ CREATE TABLE inventory_movements (
     product_id VARCHAR(20) NOT NULL,
     product_type ENUM('FILLED', 'EMPTY', 'DAMAGED') NOT NULL,
     movement_type ENUM(
-        'Initial Stock',
+		'Initial Stock',
         'PURCHASE_RECEIVED',
         'DISPATCH_LOADED',
         'DISPATCH_RETURNED',
@@ -260,9 +259,11 @@ CREATE TABLE lorry_stock (
     product_id VARCHAR(20) NOT NULL,
     product_type ENUM('FILLED', 'EMPTY') NOT NULL COMMENT 'Only FILLED and EMPTY tracked on lorry',
     loaded_quantity INT NOT NULL DEFAULT 0 COMMENT 'Initial quantity loaded from warehouse',
-    sold_quantity INT DEFAULT 0 COMMENT 'Quantity sold during dispatch',
+    sold_filled INT DEFAULT 0 COMMENT 'Quantity of filled cylinders sold (exchange)',
+    sold_new INT DEFAULT 0 COMMENT 'Quantity of new cylinders sold (first-time)',
+    empty_collected INT DEFAULT 0 COMMENT 'Empty cylinders collected from dealers',
     damaged_quantity INT DEFAULT 0 COMMENT 'Quantity damaged during dispatch',
-    balance_quantity INT GENERATED ALWAYS AS (loaded_quantity - sold_quantity - damaged_quantity) STORED COMMENT 'Auto-calculated remaining quantity',
+    balance_quantity INT GENERATED ALWAYS AS (loaded_quantity - sold_filled - sold_new - damaged_quantity) STORED COMMENT 'Auto-calculated remaining quantity',
     last_updated DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     UNIQUE KEY unique_dispatch_product_type (dispatch_id, product_id, product_type),
     FOREIGN KEY (dispatch_id) REFERENCES dispatches(dispatch_id) ON DELETE CASCADE,
@@ -302,6 +303,7 @@ CREATE TABLE invoice_items (
     quantity INT NOT NULL,
     unit_price DECIMAL(10,2) NOT NULL,
     total_price DECIMAL(10,2) NOT NULL,
+    empty_returned INT DEFAULT 0 COMMENT 'Empty cylinders returned by dealer (for exchange sales)',
     FOREIGN KEY (invoice_id) REFERENCES invoices(invoice_id) ON DELETE CASCADE,
     FOREIGN KEY (product_id) REFERENCES products(product_id),
     INDEX idx_invoice (invoice_id),
@@ -402,6 +404,3 @@ CREATE TABLE lorry_daily_sales (
     INDEX idx_lorry (lorry_id),
     INDEX idx_supervisor (supervisor_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-
-

@@ -1,19 +1,44 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import AdminSidebar from '../../components/AdminSidebar';
 import '../../styles/Dashboard.css';
 import { Package, Users, Truck, DollarSign, FileText, TrendingUp } from 'lucide-react';
+import { dashboardApi } from '../../services/api';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 
 const AdminDashboard = () => {
     const navigate = useNavigate();
-    const stats = [
-        { title: 'Total Inventory', value: '3,450', icon: <Package size={20} />, color: '#4facfe' },
-        { title: 'Active Dealers', value: '42', icon: <Users size={20} />, color: '#00f2fe' },
-        { title: 'Active Supervisors', value: '8', icon: <Users size={20} />, color: '#43e97b' },
-        { title: 'Dispatches Today', value: '12', icon: <Truck size={20} />, color: '#fa709a' },
-        { title: 'Pending Credits', value: 'Rs.45,000', icon: <FileText size={20} />, color: '#f093fb' },
-        { title: 'Monthly Revenue', value: 'Rs. 2.5M', icon: <TrendingUp size={20} />, color: '#4facfe' },
-    ];
+    const [stats, setStats] = useState(null);
+
+    useEffect(() => {
+        const fetchStats = async () => {
+            try {
+                const response = await dashboardApi.getStats();
+                setStats(response.data.data);
+            } catch (error) {
+                console.error('Failed to fetch stats:', error);
+            }
+        };
+        fetchStats();
+    }, []);
+
+    const getSalesTrend = async (req, res, next) => {
+        try {
+            const pool = await getConnection();
+            const [rows] = await pool.execute(`
+                SELECT 
+                    DATE(created_at) as date,
+                    SUM(total_amount) as sales
+                FROM invoices
+                WHERE created_at >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
+                GROUP BY DATE(created_at)
+                ORDER BY date
+            `);
+            return successResponse(res, 200, 'Sales trend retrieved', rows);
+        } catch (error) {
+            next(error);
+        }
+    };
 
     return (
         <>
@@ -33,7 +58,14 @@ const AdminDashboard = () => {
                     </div>
 
                     <div className="stats-grid">
-                        {stats.map((stat, index) => (
+                        {stats && [
+                            { title: 'Total Inventory', value: stats.totalInventory, icon: <Package size={20} />, color: '#4facfe' },
+                            { title: 'Active Dealers', value: stats.activeDealers, icon: <Users size={20} />, color: '#00f2fe' },
+                            { title: 'Active Supervisors', value: stats.activeSupervisors, icon: <Users size={20} />, color: '#43e97b' },
+                            { title: 'Dispatches Today', value: stats.dispatchesToday, icon: <Truck size={20} />, color: '#fa709a' },
+                            { title: 'Pending Credits', value: stats.pendingCredits, icon: <FileText size={20} />, color: '#f093fb' },
+                            { title: 'Monthly Revenue', value: stats.monthlyRevenue, icon: <TrendingUp size={20} />, color: '#4facfe' },
+                        ].map((stat, index) => (
                             <div key={index} className="stat-card">
                                 <div className="stat-header">
                                     <div className="stat-icon" style={{ backgroundColor: stat.color }}>

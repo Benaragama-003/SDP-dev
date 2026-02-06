@@ -5,6 +5,8 @@ const helmet = require('helmet');
 const compression = require('compression');
 const morgan = require('morgan');
 require('dotenv').config();
+const { startCreditCronJobs } = require('./cron/creditCron')
+
 
 const { getConnection } = require('./config/database');
 const errorHandler = require('./middleware/errorHandler');
@@ -17,8 +19,11 @@ const invoiceRoutes = require('./routes/invoiceRoutes');
 const poRoutes = require('./routes/purchaseOrderRoutes');
 const dispatchRoutes = require('./routes/dispatchRoutes');
 const lorryRoutes = require('./routes/lorryRoutes');
-
+const creditRoutes = require('./routes/creditRoutes');
+const chequeRoutes = require('./routes/chequeRoutes');
+const dashboardRoutes = require('./routes/dashboardRoutes');
 const app = express();
+exports.app = app;
 const PORT = process.env.PORT || 5000;
 const API_PREFIX = process.env.API_PREFIX || '/api/v1';
 
@@ -45,12 +50,15 @@ app.get('/health', (req, res) => {
 
 // API Routes
 app.use(`${API_PREFIX}/auth`, authRoutes);
+app.use(`${API_PREFIX}/dashboard`, dashboardRoutes);
 app.use(`${API_PREFIX}/dealers`, dealerRoutes);
 app.use(`${API_PREFIX}/products`, productRoutes);
 app.use(`${API_PREFIX}/invoices`, invoiceRoutes);
-app.use(`${API_PREFIX}/purchase-orders`, poRoutes);
 app.use(`${API_PREFIX}/dispatches`, dispatchRoutes);
 app.use(`${API_PREFIX}/lorries`, lorryRoutes);
+app.use(`${API_PREFIX}/purchase-orders`, poRoutes);
+app.use(`${API_PREFIX}/credit`, creditRoutes);
+app.use(`${API_PREFIX}/cheques`, chequeRoutes);
 
 // 404 handler
 app.use((req, res) => {
@@ -67,15 +75,17 @@ app.use(errorHandler);
 const startServer = async () => {
   try {
     await getConnection();
-    console.log('✅ Database connected successfully');
+    console.log('Database connected successfully');
+
+    startCreditCronJobs();
 
     app.listen(PORT, () => {
-      console.log(`🚀 Server running on http://localhost:${PORT}`);
-      console.log(`📍 API Base: http://localhost:${PORT}${API_PREFIX}`);
-      console.log(`📍 Environment: ${process.env.NODE_ENV || 'development'}`);
+      console.log(` Server running on http://localhost:${PORT}`);
+      console.log(` API Base: http://localhost:${PORT}${API_PREFIX}`);
+      console.log(` Environment: ${process.env.NODE_ENV || 'development'}`);
     });
   } catch (error) {
-    console.error('❌ Failed to start server:', error.message);
+    console.error('Failed to start server:', error.message);
     process.exit(1);
   }
 };

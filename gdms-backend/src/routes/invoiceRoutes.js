@@ -7,18 +7,20 @@ const { checkRole } = require('../middleware/roleCheck');
 // All invoice routes require a login
 router.use(authenticateToken);
 
-// 1. Invoicing (Supervisor only)
-router.post('/', checkRole('SUPERVISOR'), invoiceController.createInvoice);
+// 1. Get invoices (Supervisor sees their own, Admin sees all)
+router.get('/', checkRole(['ADMIN', 'SUPERVISOR']), invoiceController.getAllInvoices);
 
-// 2. Reporting
-router.get('/', checkRole('ADMIN', 'SUPERVISOR'), invoiceController.getAllInvoices);
+// 2. Create invoice (Supervisor only)
+router.post('/', checkRole(['SUPERVISOR']), invoiceController.createInvoice);
 
-// 3. Trip Management (Supervisor)
-router.patch('/:dispatch_id/complete', checkRole('SUPERVISOR'), invoiceController.completeTrip);
-router.post('/report-damage', checkRole('SUPERVISOR'), invoiceController.reportDamage);
+// 3. Report damage (Supervisor only)
+router.post('/report-damage', checkRole(['SUPERVISOR']), invoiceController.reportDamage);
 
-// 4. Admin Finalization
-router.post('/accept-unload', checkRole('ADMIN'), invoiceController.acceptUnload);
-router.post('/cancel-dispatch', checkRole('ADMIN'), invoiceController.cancelDispatch);
+// 4. Admin only routes
+router.post('/accept-unload', checkRole(['ADMIN']), invoiceController.acceptUnload);
+router.post('/cancel-dispatch', checkRole(['ADMIN']), invoiceController.cancelDispatch);
+
+// 5. Download invoice PDF
+router.get('/:id/pdf', invoiceController.downloadInvoicePDF);
 
 module.exports = router;

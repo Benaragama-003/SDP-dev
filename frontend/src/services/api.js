@@ -44,6 +44,10 @@ export const authApi = {
     updatePassword: (currentPassword, newPassword) => api.put('/auth/password', { currentPassword, newPassword }),
 };
 
+export const dashboardApi = {
+    getStats: () => api.get('/dashboard/stats')
+};
+
 // Dealer API methods
 export const dealerApi = {
     // Get all dealers with optional search parameter
@@ -116,5 +120,114 @@ export const productApi = {
         });
     },
 };
+
+// Purchase Order API
+export const purchaseOrderApi = {
+    getAll: (params = {}) => {
+        const queryString = new URLSearchParams(params).toString();
+        return api.get(`/purchase-orders${queryString ? `?${queryString}` : ''}`);
+    },
+    
+    getById: (id) => api.get(`/purchase-orders/${id}`),
+    
+    create: (data) => api.post('/purchase-orders', data),
+    
+    approve: (id) => api.put(`/purchase-orders/${id}/approve`),
+    
+    receive: (id, data = {}) => api.put(`/purchase-orders/${id}/receive`, data),
+    
+    cancel: (id) => api.put(`/purchase-orders/${id}/cancel`),
+    
+    // Get available empty stock for refill validation
+    getEmptyStock: () => api.get('/purchase-orders/empty-stock'),
+};
+
+// Dispatch API
+export const dispatchApi = {
+    // Get all dispatches with filters
+    getAll: (params = {}) => {
+        const queryString = new URLSearchParams(params).toString();
+        return api.get(`/dispatches${queryString ? `?${queryString}` : ''}`);
+    },
+    
+    // Get single dispatch by ID
+    getById: (id) => api.get(`/dispatches/${id}`),
+    
+    // Get available resources (lorries, supervisors, inventory, routes)
+    getResources: () => api.get('/dispatches/resources'),
+    
+    // Create new dispatch
+    create: (data) => api.post('/dispatches', data),
+    
+    // Start dispatch (SCHEDULED -> IN_PROGRESS)
+    start: (id) => api.put(`/dispatches/${id}/start`),
+    
+    // Request unload (supervisor ends day)
+    requestUnload: (id) => api.put(`/dispatches/${id}/request-unload`),
+    
+    // Accept unload (admin returns stock to warehouse)
+    acceptUnload: (id, data = {}) => api.put(`/dispatches/${id}/accept-unload`, data),
+    
+    // Cancel dispatch
+    cancel: (id) => api.put(`/dispatches/${id}/cancel`),
+    
+    // Update progress (sold/damaged)
+    updateProgress: (id, data) => api.put(`/dispatches/${id}/progress`, data),
+    
+    // Get supervisor's active dispatch
+    getMyDispatch: () => api.get('/dispatches/my/active'),
+};
+
+// Invoice API
+export const invoiceApi = {
+    // Get all invoices (admin sees all, supervisor sees their own)
+    getAll: (params = {}) => {
+        const queryString = new URLSearchParams(params).toString();
+        return api.get(`/invoices${queryString ? `?${queryString}` : ''}`);
+    },
+    
+    // Create new invoice (deducts from lorry stock)
+    create: (data) => api.post('/invoices', data),
+    
+    // Report damage during dispatch
+    reportDamage: (data) => api.post('/invoices/report-damage', data),
+    
+    // Download invoice as PDF
+    downloadPDF: (id) => api.get(`/invoices/${id}/pdf`, { responseType: 'blob' }),
+};
+
+// Credit API
+export const creditApi = {
+    // Get all credit accounts with dealer summary
+    getAll: () => api.get('/credit'),
+    
+    // Get credit summary for dashboard
+    getSummary: () => api.get('/credit/summary'),
+    
+    // Get outstanding credits for a specific dealer
+    getDealerCredits: (dealerId) => api.get(`/credit/dealer/${dealerId}`),
+    
+    // Get settlement history for a dealer
+    getHistory: (dealerId) => api.get(`/credit/history/${dealerId}`),
+    
+    // Settle credit (record payment)
+    settle: (data) => api.post('/credit/settle', data),
+    
+    // Update overdue status
+    updateOverdue: () => api.post('/credit/update-overdue'),
+};
+
+// Cheque API
+export const chequeApi = {
+    // Get all cheques
+    getAll: () => api.get('/cheques'),
+    
+    // Update cheque status (CLEARED, RETURNED, CANCELLED)
+    updateStatus: (chequePaymentId, data) => api.put(`/cheques/${chequePaymentId}/status`, data),
+};
+
+// Download PDF
+export const downloadPDF = (id) => api.get(`/invoices/${id}/pdf`, { responseType: 'blob' });
+
 
 export default api;
