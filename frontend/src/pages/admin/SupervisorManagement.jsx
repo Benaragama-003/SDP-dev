@@ -122,7 +122,6 @@ const SupervisorManagement = () => {
                         <table className="data-table">
                             <thead>
                                 <tr>
-                                    <th>ID</th>
                                     <th>Name</th>
                                     <th>Target</th>
                                     <th>Account</th>
@@ -146,7 +145,6 @@ const SupervisorManagement = () => {
                         ) : (
                             filtered.map((sup) => (
                                     <tr key={sup.user_id}>
-                                        <td>{sup.user_id}</td>
                                         <td>{sup.full_name}</td>
                                         <td style={{ fontWeight: '500', color: '#101540' }}>
                                             Rs. {Number(sup.monthly_target || 0).toLocaleString('en-US')}
@@ -205,20 +203,16 @@ const SupervisorManagement = () => {
                 {/* View Details Modal */}
                 {showDetailsModal && selectedSup && (
                     <div className="modal-overlay" onClick={() => setShowDetailsModal(false)}>
-                        <div className="modal-content" onClick={e => e.stopPropagation()} style={{ padding: '11px', borderRadius: '20px', maxWidth: '500px', width: '100%' }}>
-                            <div className="modal-header" style={{ marginBottom: '10px', borderBottom: '1px solid #eee', paddingBottom: '15px' }}>
+                        <div className="modal-content" onClick={e => e.stopPropagation()} style={{ padding: '30px', borderRadius: '20px', maxWidth: '500px', width: '100%' }}>
+                            <div className="modal-header" style={{ marginBottom: '20px', borderBottom: '1px solid #eee', paddingBottom: '15px' }}>
                                 <h2 style={{ fontSize: '20px', margin: 0 }}>Supervisor Details</h2>
                             </div>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 15px', backgroundColor: '#f9fafb', borderRadius: '8px' }}>
-                                    <span style={{ color: '#6b7280', minWidth: '120px' }}>ID</span>
-                                    <span style={{ fontWeight: '600', textAlign: 'right' }}>{selectedSup.user_id}</span>
-                                </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 15px', backgroundColor: '#f9fafb', borderRadius: '8px' }}>
                                     <span style={{ color: '#6b7280', minWidth: '120px' }}>Full Name</span>
                                     <span style={{ fontWeight: '600', textAlign: 'right' }}>{selectedSup.full_name}</span>
                                 </div>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 15px', backgroundColor: '#f9fafb', borderRadius: '8px', gap: '20px' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 15px', backgroundColor: '#f9fafb', borderRadius: '8px' }}>
                                     <span style={{ color: '#6b7280', minWidth: '120px', flexShrink: 0 }}>Email</span>
                                     <span style={{ fontWeight: '600', textAlign: 'right', wordBreak: 'break-all' }}>{selectedSup.email}</span>
                                 </div>

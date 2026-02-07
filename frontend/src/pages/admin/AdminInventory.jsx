@@ -63,11 +63,13 @@ const handlePriceUpdate = async (e) => {
     }
     try {
         setSubmitting(true);
-        await productApi.updateProduct(selectedProduct, {
+        const resp = await productApi.updateProduct(selectedProduct, {
+            filled_purchase_price: priceForm.filled_purchase_price || undefined,
             filled_selling_price: priceForm.filled_selling_price || undefined,
+            new_purchase_price: priceForm.new_purchase_price || undefined,
             new_selling_price: priceForm.new_selling_price || undefined
         });
-        alert('Prices updated successfully!');
+        alert(resp.data?.message || 'Prices updated successfully!');
         setShowPriceUpdate(false);
         setPriceForm({ filled_selling_price: '', new_selling_price: '' });
         setSelectedProduct('');
@@ -120,6 +122,7 @@ const handleToggleProductStatus = async (productId, currentStatus) => {
 
 const handleExport = async () => {
     try {
+        // note: backend expects start_date / end_date (not from/to)
         const params = {};
         if (exportFilters.start_date) params.start_date = exportFilters.start_date;
         if (exportFilters.end_date) params.end_date = exportFilters.end_date;
@@ -140,7 +143,27 @@ const handleExport = async () => {
         setExportFilters({ start_date: '', end_date: '' });
     } catch (err) {
         console.error('Failed to export', err);
-        alert('Failed to export inventory report. Please try again later.');
+        // if server returned JSON error, parse it and show message
+        let msg = 'Failed to export inventory report';
+        if (err.response?.data) {
+            try {
+                // axios may return JSON error even for non-200
+                const reader = new FileReader();
+                reader.onload = () => {
+                    try {
+                        const json = JSON.parse(reader.result);
+                        alert(json.message || msg);
+                    } catch {
+                        alert(msg);
+                    }
+                };
+                reader.readAsText(err.response.data);
+            } catch {
+                alert(msg);
+            }
+        } else {
+            alert(msg);
+        }
     }
 };
     return (
@@ -277,6 +300,15 @@ const handleExport = async () => {
                                             </select>
                                         </div>
                                         <div className="form-field">
+                                            <label>Filled Purchasing Price (Rs)</label>
+                                            <input 
+                                                type="number" 
+                                                placeholder="New price" 
+                                                value={priceForm.filled_purchase_price}
+                                                onChange={(e) => setPriceForm({...priceForm, filled_purchase_price: e.target.value})}
+                                            />
+                                        </div>                                       
+                                        <div className="form-field">
                                             <label>Filled Selling Price (Rs)</label>
                                             <input 
                                                 type="number" 
@@ -286,7 +318,16 @@ const handleExport = async () => {
                                             />
                                         </div>
                                         <div className="form-field">
-                                            <label>New Cylinder Price (Rs)</label>
+                                            <label>New Purchasing Price (Rs)</label>
+                                            <input 
+                                                type="number" 
+                                                placeholder="New price" 
+                                                value={priceForm.new_purchase_price}
+                                                onChange={(e) => setPriceForm({...priceForm, new_purchase_price: e.target.value})}
+                                            />
+                                        </div>                                        
+                                        <div className="form-field">
+                                            <label>New Selling Price (Rs)</label>
                                             <input 
                                                 type="number" 
                                                 placeholder="New price" 
@@ -461,86 +502,41 @@ const handleExport = async () => {
                 {/* Export Filter Modal */}
                 {showExportModal && (
                     <div className="modal-overlay" onClick={() => setShowExportModal(false)}>
-                        <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '450px' }}>
+                        <div className="modal-content" style={{ maxWidth: '500px' }} onClick={e => e.stopPropagation()}>
                             <div className="modal-header">
                                 <h2 className="modal-title">Export Inventory Report</h2>
                                 <button className="modal-close" onClick={() => setShowExportModal(false)}>×</button>
                             </div>
-                            <div className="modal-body" style={{ padding: '20px' }}>
-                                <p style={{ marginBottom: '20px', color: '#666' }}>
-                                    Export current inventory and stock movements to Excel. 
-                                
-                                </p>
-                                
-                                <div style={{ marginBottom: '15px' }}>
-                                    <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500' }}>
-                                        Start Date (optional)
-                                    </label>
+                            <div className="modal-body">
+                                <p style={{ color: '#666', marginBottom: '20px' }}>Export current inventory and stock movements to Excel.</p>
+                                <div className="form-field" style={{ marginBottom: '15px' }}>
+                                    <label>Start Date (optional)</label>
                                     <input
                                         type="date"
                                         value={exportFilters.start_date}
-                                        onChange={(e) => setExportFilters(prev => ({ ...prev, start_date: e.target.value }))}
-                                        style={{
-                                            width: '100%',
-                                            padding: '10px',
-                                            borderRadius: '6px',
-                                            border: '1px solid #ddd',
-                                            fontSize: '14px'
-                                        }}
+                                        onChange={e => setExportFilters(f => ({ ...f, start_date: e.target.value }))}
                                     />
                                 </div>
-                                
-                                <div style={{ marginBottom: '20px' }}>
-                                    <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500' }}>
-                                        End Date (optional)
-                                    </label>
+                                <div className="form-field" style={{ marginBottom: '15px' }}>
+                                    <label>End Date (optional)</label>
                                     <input
                                         type="date"
                                         value={exportFilters.end_date}
-                                        onChange={(e) => setExportFilters(prev => ({ ...prev, end_date: e.target.value }))}
-                                        style={{
-                                            width: '100%',
-                                            padding: '10px',
-                                            borderRadius: '6px',
-                                            border: '1px solid #ddd',
-                                            fontSize: '14px'
-                                        }}
+                                        onChange={e => setExportFilters(f => ({ ...f, end_date: e.target.value }))}
                                     />
                                 </div>
-
-                                <div style={{ 
-                                    backgroundColor: '#f0f9ff', 
-                                    padding: '12px', 
-                                    borderRadius: '8px',
-                                    fontSize: '13px',
-                                    color: '#0369a1'
-                                }}>
-                                    <strong>Note:</strong> The exported Excel will have 2 sheets:
-                                    <ul style={{ margin: '8px 0 0 0', paddingLeft: '20px' }}>
+                                <div style={{ padding: '12px', backgroundColor: '#fef9c3', borderRadius: '8px', fontSize: '13px' }}>
+                                    <strong style={{ color: '#b45309' }}>Note:</strong> The exported Excel will have 2 sheets:
+                                    <ul style={{ margin: '5px 0 0 15px', color: '#92400e' }}>
                                         <li>Current Inventory (all products)</li>
                                         <li>Stock Movements (grouped by product)</li>
                                     </ul>
                                 </div>
                             </div>
-                            <div className="modal-footer" style={{ 
-                                padding: '15px 20px', 
-                                display: 'flex', 
-                                justifyContent: 'flex-end', 
-                                gap: '10px',
-                                borderTop: '1px solid #eee' 
-                            }}>
-                                <button 
-                                    className="btn btn-secondary" 
-                                    onClick={() => {
-                                        setShowExportModal(false);
-                                        setExportFilters({ start_date: '', end_date: '' });
-                                    }}
-                                >
-                                    Cancel
-                                </button>
+                            <div className="modal-footer" style={{ padding: '20px', display: 'flex', justifyContent: 'flex-end', gap: '10px', borderTop: '1px solid #eee' }}>
+                                <button className="btn btn-danger" onClick={() => setShowExportModal(false)}>Cancel</button>
                                 <button className="btn btn-primary" onClick={handleExport}>
-                                    <Download size={18} />
-                                    Export Now
+                                    <Download size={18} /> Export Now
                                 </button>
                             </div>
                         </div>

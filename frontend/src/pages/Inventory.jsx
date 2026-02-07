@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import Sidebar from '../components/Sidebar';
 import { Search, AlertTriangle, Loader2 } from 'lucide-react';
-import api from '../services/api';
+import api, { dispatchApi, invoiceApi } from '../services/api';
 import '../styles/Inventory.css';
 
 
@@ -11,6 +11,8 @@ const Inventory = () => {
     const [inventoryData, setInventoryData] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showDamageModal, setShowDamageModal] = useState(false);
+    const [activeDispatch, setActiveDispatch] = useState(null);
+    const [dispatchItems, setDispatchItems] = useState([]);
 
     const [damageData, setDamageData] = useState({
         productId: '',
@@ -33,14 +35,46 @@ const Inventory = () => {
 
     useEffect(() => {
         fetchInventory();
+        fetchActiveDispatch();
     }, []);
 
-    const handleDamageReport = (e) => {
+    const fetchActiveDispatch = async () => {
+        try {
+            const res = await dispatchApi.getMyDispatch();
+            if (res.data.data) {
+                setActiveDispatch(res.data.data);
+                // Filter only FILLED items with balance > 0
+                const filledItems = (res.data.data.items || []).filter(
+                    item => item.product_type === 'FILLED' && item.balance_quantity > 0
+                );
+                setDispatchItems(filledItems);
+            }
+        } catch (err) {
+            console.error('Failed to fetch active dispatch', err);
+        }
+    };
+
+    const handleDamageReport = async (e) => {
         e.preventDefault();
-        console.log('Damage Data Submitted:', damageData);
-        alert(`Damage Report submitted successfully!`);
-        setShowDamageModal(false);
-        setDamageData({ productId: '', quantity: '', reason: '' });
+        if (!activeDispatch) {
+            alert('No active dispatch found. Cannot report damage.');
+            return;
+        }
+        try {
+            await invoiceApi.reportDamage({
+                dispatch_id: activeDispatch.dispatch_id,
+                product_id: damageData.productId,
+                quantity: parseInt(damageData.quantity),
+                damage_reason: damageData.reason
+            });
+            alert('Damage reported successfully!');
+            setShowDamageModal(false);
+            setDamageData({ productId: '', quantity: '', reason: '' });
+            fetchActiveDispatch(); // refresh balance quantities
+        } catch (err) {
+            console.error('Failed to report damage', err);
+            alert('Failed to report damage: ' + (err.response?.data?.message || err.message));
+        }
     };
 
     const filteredData = (inventoryData || []).filter((item) =>
@@ -58,7 +92,13 @@ const Inventory = () => {
                             <p className="page-subtitle">Monitor gas cylinder inventory levels</p>
                         </div>
                         <div style={{ display: 'flex', gap: '12px' }}>
-                            <button className="btn btn-danger" style={{ backgroundColor: '#dc3545', color: 'white' }} onClick={() => setShowDamageModal(true)}>
+                            <button 
+                                className="btn btn-danger" 
+                                style={{ backgroundColor: '#dc3545', color: 'white' }} 
+                                onClick={() => setShowDamageModal(true)}
+                                disabled={dispatchItems.length === 0}
+                                title={dispatchItems.length === 0 ? 'No active dispatch with available stock' : ''}
+                            >
                                 <AlertTriangle size={20} />
                                 Report Damage
                             </button>
@@ -125,34 +165,39 @@ const Inventory = () => {
                     <div className="modal-overlay" onClick={() => setShowDamageModal(false)}>
                         <div className="modal-content" onClick={e => e.stopPropagation()}>
                             <div className="modal-header">
-                                <h2 className="modal-title">Report Damage Inventory</h2>
+                                <h2 className="modal-title">Report Dispatch Damage</h2>
                                 <button className="modal-close" onClick={() => setShowDamageModal(false)}>×</button>
                             </div>
                             <form onSubmit={handleDamageReport}>
                                 <div className="modal-body">
                                     <div className="form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '15px' }}>
                                         <div className="form-field">
-                                            <label>Product (Cylinder Size)</label>
+                                            <label>Product (from active dispatch)</label>
                                             <select
                                                 required
                                                 value={damageData.productId}
-                                                onChange={(e) => setDamageData({ ...damageData, productId: e.target.value })}
+                                                onChange={(e) => setDamageData({ ...damageData, productId: e.target.value, quantity: '' })}
                                             >
-                                                <option value="">Select Size...</option>
-                                                {inventoryData.map((item, idx) => (
-                                                    <option key={idx} value={item.cylinder_size}>
-                                                        {item.cylinder_size}
+                                                <option value="">Select Product...</option>
+                                                {dispatchItems.map((item, idx) => (
+                                                    <option key={idx} value={item.product_id}>
+                                                        {item.size} — Balance: {item.balance_quantity}
                                                     </option>
                                                 ))}
                                             </select>
                                         </div>
                                         <div className="form-field">
-                                            <label>Quantity Damaged</label>
+                                            <label>Quantity Damaged {damageData.productId && (
+                                                <span style={{ color: '#666', fontSize: '12px' }}>
+                                                    (max: {dispatchItems.find(i => i.product_id === damageData.productId)?.balance_quantity || 0})
+                                                </span>
+                                            )}</label>
                                             <input
                                                 type="number"
                                                 required
                                                 placeholder="0"
                                                 min="1"
+                                                max={dispatchItems.find(i => i.product_id === damageData.productId)?.balance_quantity || 1}
                                                 value={damageData.quantity}
                                                 onChange={(e) => setDamageData({ ...damageData, quantity: e.target.value })}
                                             />

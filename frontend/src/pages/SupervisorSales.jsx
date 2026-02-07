@@ -1,34 +1,27 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Sidebar from '../components/Sidebar';
 import { TrendingUp, Download } from 'lucide-react';
-import { useAuth } from '../context/AuthContext';
 import '../styles/Dashboard.css';
 import { formatDate } from '../utils/dateUtils';
+import { salesApi } from '../services/api';
 
 const SupervisorSales = () => {
-    const { user } = useAuth();
 
-    // Mock daily sales data for the supervisor
-    const supervisorSales = [
-        {
-            date: new Date().toISOString().split('T')[0],
-            lorry: 'CAA-1234', // In real app, this would be from user's assigned lorry
-            itemsCount: '45 cylinders',
-            amount: 67500,
-            items: [
-                { size: '5kg', type: 'New', quantity: 20, price: 1500, amount: 30000 },
-                { size: '12.5kg', type: 'Filled', quantity: 10, price: 3000, amount: 30000 },
-                { size: '5kg', type: 'Filled', quantity: 5, price: 1500, amount: 7500 },
-            ],
-            details: { cash: 20000, cheque: 30000, credit: 17500 }
-        }
-    ];
+    const [salesData, setSalesData] = useState({ stats: { revenue: 0, orders: 0, cylinders: 0 }, sales: [], paymentBreakdown: { cash: 0, cheque: 0, credit: 0 } });
+    const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
 
-    const stats = {
-        revenue: 67500,
-        orders: 5,
-        cylinders: 45
-    };
+    useEffect(() => {
+        const fetchSales = async () => {
+            try {
+                const res = await salesApi.getMySales(selectedDate);
+                setSalesData(res.data.data);
+            } catch (err) {
+                console.error('Failed to fetch sales:', err);
+            }
+        };
+
+        fetchSales();
+    }, [selectedDate]);
 
     const [selectedSale, setSelectedSale] = useState(null);
     const [showDetailModal, setShowDetailModal] = useState(false);
@@ -46,7 +39,7 @@ const SupervisorSales = () => {
                     <div className="page-header">
                         <div>
                             <h1 className="page-title">My Daily Sales</h1>
-                            <p className="page-subtitle">Personal sales performance for today</p>
+                            <p className="page-subtitle">Personal sales performance for {formatDate(selectedDate)}</p>
                         </div>
                         <div style={{ display: 'flex', gap: '12px' }}>
                             <button className="btn btn-primary">
@@ -56,6 +49,13 @@ const SupervisorSales = () => {
                         </div>
                     </div>
 
+                    <input
+                        type="date"
+                        value={selectedDate}
+                        onChange={(e) => setSelectedDate(e.target.value)}
+                        className="filter-select"
+                    />
+
                     <div className="stats-grid">
                         <div className="stat-card">
                             <div className="stat-header">
@@ -64,7 +64,7 @@ const SupervisorSales = () => {
                                 </div>
                                 <span className="stat-title">Today's Revenue</span>
                             </div>
-                            <div className="stat-value">Rs. {stats.revenue.toLocaleString()}</div>
+                            <div className="stat-value">Rs. {salesData.stats.revenue.toLocaleString()}</div>
                         </div>
 
                         <div className="stat-card">
@@ -74,7 +74,7 @@ const SupervisorSales = () => {
                                 </div>
                                 <span className="stat-title">Today's Orders</span>
                             </div>
-                            <div className="stat-value">{stats.orders}</div>
+                            <div className="stat-value">{salesData.stats.orders}</div>
                         </div>
 
                         <div className="stat-card">
@@ -84,7 +84,7 @@ const SupervisorSales = () => {
                                 </div>
                                 <span className="stat-title">Cylinders Sold</span>
                             </div>
-                            <div className="stat-value">{stats.cylinders}</div>
+                            <div className="stat-value">{salesData.stats.cylinders}</div>
                         </div>
                     </div>
 
@@ -103,12 +103,12 @@ const SupervisorSales = () => {
                                 </tr>
                             </thead>
                             <tbody>
-                                {supervisorSales.map((sale, index) => (
+                                {salesData.sales.map((sale, index) => (
                                     <tr key={index}>
-                                        <td>{formatDate(sale.date)}</td>
+                                        <td>{formatDate(sale.dispatch_date)}</td>
                                         <td>{sale.lorry}</td>
-                                        <td>{sale.itemsCount}</td>
-                                        <td>Rs. {sale.amount.toLocaleString()}</td>
+                                        <td>{sale.cylinders_sold} cylinders</td>
+                                        <td>Rs. {parseFloat(sale.total_amount).toLocaleString()}</td>
                                         <td>
                                             <button className="btn btn-sm btn-secondary" onClick={() => handleViewClick(sale)} style={{ fontSize: '12px', padding: '5px 10px' }}>
                                                 View Details
@@ -137,7 +137,7 @@ const SupervisorSales = () => {
                                     </div>
                                     <div>
                                         <p style={{ fontSize: '12px', color: '#666' }}>Date</p>
-                                        <p style={{ fontWeight: '600' }}>{formatDate(selectedSale.date)}</p>
+                                        <p style={{ fontWeight: '600' }}>{formatDate(selectedSale.dispatch_date)}</p>
                                     </div>
                                 </div>
 
@@ -167,20 +167,20 @@ const SupervisorSales = () => {
                                 <div style={{ background: '#fff', border: '1px solid #eee', padding: '20px', borderRadius: '12px' }}>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
                                         <span>Cash Sales</span>
-                                        <span style={{ fontWeight: '600' }}>Rs. {selectedSale.details.cash.toLocaleString()}</span>
+                                        <span style={{ fontWeight: '600' }}>Rs. {parseFloat(selectedSale.cash).toLocaleString()}</span>
                                     </div>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
                                         <span>Cheque Sales</span>
-                                        <span style={{ fontWeight: '600' }}>Rs. {selectedSale.details.cheque.toLocaleString()}</span>
+                                        <span style={{ fontWeight: '600' }}>Rs. {parseFloat(selectedSale.cheque).toLocaleString()}</span>
                                     </div>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
                                         <span>Credit Sales</span>
-                                        <span style={{ fontWeight: '600' }}>Rs. {selectedSale.details.credit.toLocaleString()}</span>
+                                        <span style={{ fontWeight: '600' }}>Rs. {parseFloat(selectedSale.credit).toLocaleString()}</span>
                                     </div>
                                     <hr style={{ borderTop: '2px solid #f5f5f5', margin: '15px 0' }} />
                                     <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '10px', fontSize: '18px', fontWeight: 'bold', color: '#101540' }}>
-                                        <span>Total Collected</span>
-                                        <span>Rs. {selectedSale.amount.toLocaleString()}</span>
+                                        <span>Total Sales</span>
+                                        <span>Rs. {parseFloat(selectedSale.total_amount).toLocaleString()}</span>
                                     </div>
                                 </div>
                             </div>

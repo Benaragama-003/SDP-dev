@@ -24,7 +24,7 @@ const startCreditCronJobs = () => {
         }
     });
 
-    console.log(' Credit cron jobs initialized');
+    console.log('Credit cron jobs initialized');
 };
 
 module.exports = { startCreditCronJobs };

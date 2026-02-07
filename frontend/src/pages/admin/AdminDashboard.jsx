@@ -59,12 +59,11 @@ const AdminDashboard = () => {
 
                     <div className="stats-grid">
                         {stats && [
-                            { title: 'Total Inventory', value: stats.totalInventory, icon: <Package size={20} />, color: '#4facfe' },
+                            { title: 'Pending PO', value: stats.pendingPurchaseOrders, icon: <Package size={20} />, color: '#4facfe' },
                             { title: 'Active Dealers', value: stats.activeDealers, icon: <Users size={20} />, color: '#00f2fe' },
-                            { title: 'Active Supervisors', value: stats.activeSupervisors, icon: <Users size={20} />, color: '#43e97b' },
-                            { title: 'Dispatches Today', value: stats.dispatchesToday, icon: <Truck size={20} />, color: '#fa709a' },
-                            { title: 'Pending Credits', value: stats.pendingCredits, icon: <FileText size={20} />, color: '#f093fb' },
-                            { title: 'Monthly Revenue', value: stats.monthlyRevenue, icon: <TrendingUp size={20} />, color: '#4facfe' },
+                            { title: 'Dispatches Today', value: stats.dispatchesToday, icon: <Truck size={20} />, color: '#43e97b' },
+                            { title: 'Pending Credits', value: `Rs ${stats.pendingCredits?.toLocaleString() || 0}`, icon: <FileText size={20} />, color: '#fa709a' },
+                            { title: 'Monthly Revenue', value: `Rs ${stats.monthlyRevenue?.toLocaleString() || 0}`, icon: <TrendingUp size={20} />, color: '#f093fb' },
                         ].map((stat, index) => (
                             <div key={index} className="stat-card">
                                 <div className="stat-header">
@@ -77,6 +76,19 @@ const AdminDashboard = () => {
                             </div>
                         ))}
                     </div>
+                    {stats?.stockByProduct && (
+                        <div className="stock-section">
+                            <h3>Current Inventory Stock</h3>
+                            <div className="stock-grid">
+                                {stats.stockByProduct.map((item, index) => (
+                                    <div key={index} className="stock-card">
+                                        <span className="stock-size">{item.cylinder_size}</span>
+                                        <span className="stock-quantity">{item.quantity}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
 
                     {/* Quick Actions */}
                     <div className="quick-actions">

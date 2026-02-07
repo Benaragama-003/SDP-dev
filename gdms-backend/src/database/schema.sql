@@ -384,23 +384,3 @@ CREATE TABLE credit_settlements (
     INDEX idx_date (settlement_date)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-
--- Lorry Daily Sales Table
-CREATE TABLE lorry_daily_sales (
-    lorry_sales_id VARCHAR(20) PRIMARY KEY,
-    sales_date DATE NOT NULL,
-    lorry_id VARCHAR(20) NOT NULL,
-    supervisor_id VARCHAR(20),
-    dispatch_id VARCHAR(20),
-    total_sales DECIMAL(12,2) NOT NULL DEFAULT 0.00,
-    total_invoices INT NOT NULL DEFAULT 0,
-    total_dealers_served INT NOT NULL DEFAULT 0,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE KEY unique_lorry_date (sales_date, lorry_id),
-    FOREIGN KEY (lorry_id) REFERENCES lorries(lorry_id) ON DELETE CASCADE,
-    FOREIGN KEY (supervisor_id) REFERENCES supervisors(supervisor_id) ON DELETE SET NULL,
-    FOREIGN KEY (dispatch_id) REFERENCES dispatches(dispatch_id) ON DELETE SET NULL,
-    INDEX idx_date (sales_date),
-    INDEX idx_lorry (lorry_id),
-    INDEX idx_supervisor (supervisor_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

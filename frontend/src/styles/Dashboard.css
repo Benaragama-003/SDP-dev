@@ -119,6 +119,37 @@ body.sidebar-collapsed .dispatch-container {
     color: #000;
 }
 
+.stock-section {
+    margin-top: 2rem;
+}
+
+.stock-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1rem;
+}
+
+.stock-card {
+    background: white;
+    border-radius: 12px;
+    padding: 1rem;
+    text-align: center;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.stock-size {
+    display: block;
+    font-weight: 600;
+    color: #333;
+}
+
+.stock-quantity {
+    display: block;
+    font-size: 1.5rem;
+    color: #4facfe;
+    margin-top: 0.5rem;
+}
+
 /* Mobile Responsiveness */
 @media (max-width: 768px) {
 
@@ -182,4 +213,22 @@ body.sidebar-collapsed .dispatch-container {
 
 .action-card svg {
     color: var(--color-primary);
+}
+
+/* Filter Select */
+.filter-select {
+    padding: 10px 10px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    font-size: 14px;
+    font-family: var(--font-family-body);
+    transition: border-color 0.2s;
+    cursor: pointer;
+    background-color: white;
+    /* Ensure background is white */
+}
+
+.filter-select:focus {
+    outline: none;
+    border-color: var(--color-primary);
 }

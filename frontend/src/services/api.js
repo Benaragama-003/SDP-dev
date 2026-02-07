@@ -140,6 +140,14 @@ export const purchaseOrderApi = {
     
     // Get available empty stock for refill validation
     getEmptyStock: () => api.get('/purchase-orders/empty-stock'),
+
+    // Export purchase orders to Excel (returns blob)
+    exportToExcel: (params = {}) => {
+    const queryString = new URLSearchParams(params).toString();
+    return api.get(`/purchase-orders/export${queryString ? `?${queryString}` : ''}`, {
+        responseType: 'blob'
+    });
+    },
 };
 
 // Dispatch API
@@ -215,6 +223,15 @@ export const creditApi = {
     
     // Update overdue status
     updateOverdue: () => api.post('/credit/update-overdue'),
+};
+
+// Sales API
+export const salesApi = {
+    getMySales: (date) => api.get(`/sales/my-sales${date ? `?date=${date}` : ''}`),
+    getAllSales: (params = {}) => {
+        const queryString = new URLSearchParams(params).toString();
+        return api.get(`/sales/all${queryString ? `?${queryString}` : ''}`);
+    },
 };
 
 // Cheque API

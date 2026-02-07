@@ -1,6 +1,7 @@
 const { getConnection } = require('../config/database');
 const { successResponse, errorResponse } = require('../utils/responseHelper');
 const { generateId } = require('../utils/generateId');
+const ExcelJS = require('exceljs');
 
 // Helper function to record inventory movement
 const recordInventoryMovement = async (connection, data) => {
@@ -11,6 +12,29 @@ const recordInventoryMovement = async (connection, data) => {
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [movement_id, data.product_id, data.product_type, data.movement_type, data.quantity_change, data.quantity_before, data.quantity_after, data.reference_id, data.created_by]
     );
+};
+
+// Helper function to generate next sequential PO number
+const getNextPONumber = async (connection) => {
+    const [lastPO] = await connection.execute(
+        `SELECT order_number FROM purchase_orders 
+         ORDER BY created_at DESC, order_number DESC LIMIT 1`
+    );
+    
+    let nextNumber = 1;
+    
+    if (lastPO.length > 0) {
+        const lastOrderNumber = lastPO[0].order_number;
+        const match = lastOrderNumber.match(/PO-(\d+)/);
+        if (match) {
+            nextNumber = parseInt(match[1], 10) + 1;
+        }
+    }
+    
+    // Format: PO-01, PO-02, ..., PO-99, PO-100, PO-1000
+    const formattedNumber = nextNumber.toString().padStart(2, '0');
+    
+    return `PO-${formattedNumber}`;
 };
 
 // Get all purchase orders
@@ -135,7 +159,10 @@ const createPurchaseOrder = async (req, res, next) => {
 
         try {
             const order_id = generateId('PO');
-            const order_number = `PO-${Date.now().toString().slice(-8)}`;
+            
+            // Generate sequential PO number (PO-01, PO-02, etc.)
+            const order_number = await getNextPONumber(connection);
+            
             const subtotal = items.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0);
 
             await connection.execute(
@@ -441,6 +468,221 @@ const getEmptyStock = async (req, res, next) => {
     }
 };
 
+const exportPurchaseOrdersToExcel = async (req, res, next) => {
+    const { start_date, end_date, status, supplier } = req.query;
+
+    try {
+        const pool = await getConnection();
+
+        // Get purchase orders with items and user details
+        let query = `
+            SELECT 
+                po.order_date,
+                po.order_number,
+                po.supplier_invoice_number,
+                po.supplier,
+                po.status as order_status,
+                po.total_amount as order_total,
+                p.product_code,
+                poi.purchase_type,
+                poi.ordered_quantity,
+                poi.received_quantity,
+                poi.unit_price,
+                poi.total_price,
+                u.username as created_by_username,
+                CONCAT(u.first_name, ' ', u.last_name) as created_by_name
+            FROM purchase_orders po
+            JOIN po_items poi ON po.order_id = poi.order_id
+            JOIN products p ON poi.product_id = p.product_id
+            LEFT JOIN users u ON po.created_by = u.user_id
+            WHERE 1=1
+        `;
+        const params = [];
+
+        if (start_date) {
+            query += ' AND DATE(po.order_date) >= ?';
+            params.push(start_date);
+        }
+        if (end_date) {
+            query += ' AND DATE(po.order_date) <= ?';
+            params.push(end_date);
+        }
+        if (status) {
+            query += ' AND po.status = ?';
+            params.push(status);
+        }
+        if (supplier) {
+            query += ' AND po.supplier LIKE ?';
+            params.push(`%${supplier}%`);
+        }
+
+        query += ' ORDER BY po.order_date DESC, po.order_number DESC, p.product_code';
+        
+        const [orders] = await pool.execute(query, params);
+
+        // Create workbook
+        const workbook = new ExcelJS.Workbook();
+        const sheet = workbook.addWorksheet('Purchase Orders');
+
+        // Company Header
+        const companyHeaders = [
+            'HIDELLANA DISTRIBUTORS (PVT) LTD',
+            'No. 164, Kudagama Road, Hidellana, Ratnapura',
+            'Tel: 045-2222865 | Reg No: PV 113085',
+            `Purchase Orders Report - Generated: ${new Date().toLocaleDateString()}`
+        ];
+
+        companyHeaders.forEach((text, idx) => {
+            sheet.mergeCells(`A${idx + 1}:K${idx + 1}`);
+            const row = sheet.getRow(idx + 1);
+            row.getCell(1).value = text;
+            row.getCell(1).alignment = { horizontal: 'center' };
+            row.getCell(1).font = idx === 0 ? { bold: true, size: 14 } : { size: 11 };
+        });
+
+        // Table headers at row 6
+        sheet.getRow(6).values = [
+            'Order Date',
+            'Order No',
+            'Invoice No',
+            'Product Code',
+            'Purchase Type',
+            'Ordered Qty',
+            'Received Qty',
+            'Unit Price (Rs)',
+            'Item Total (Rs)',
+            'Order Total (Rs)',
+            'Created By'
+        ];
+        
+        sheet.getRow(6).eachCell(cell => {
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF6B21A8' } };
+            cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+            cell.alignment = { horizontal: 'center' };
+            cell.border = {
+                top: { style: 'thin' },
+                bottom: { style: 'thin' },
+                left: { style: 'thin' },
+                right: { style: 'thin' }
+            };
+        });
+
+        // Track current order for grouping
+        let currentOrderNumber = null;
+        let currentRow = 7;
+
+        // Data rows
+        orders.forEach((order) => {
+            const row = sheet.getRow(currentRow);
+            
+            // Check if this is a new order (for order total display)
+            const isNewOrder = currentOrderNumber !== order.order_number;
+            
+            row.values = [
+                new Date(order.order_date).toLocaleDateString(),
+                order.order_number,
+                order.supplier_invoice_number || '-',
+                order.product_code,
+                order.purchase_type,
+                order.ordered_quantity,
+                order.received_quantity || 0,
+                parseFloat(order.unit_price).toFixed(2),
+                parseFloat(order.total_price).toFixed(2),
+                isNewOrder ? parseFloat(order.order_total).toFixed(2) : '', // Show order total only once
+                isNewOrder ? order.created_by_username : '' // Show username only once
+            ];
+
+            row.eachCell((cell, colNumber) => {
+                cell.border = {
+                    top: { style: 'thin' },
+                    bottom: { style: 'thin' },
+                    left: { style: 'thin' },
+                    right: { style: 'thin' }
+                };
+
+                // Highlight received quantity if doesn't match ordered
+                if (colNumber === 7 && order.received_quantity !== order.ordered_quantity) {
+                    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEF3C7' } };
+                    cell.font = { bold: true, color: { argb: 'FFD97706' } };
+                }
+
+                // Format currency columns (right align)
+                if (colNumber >= 8 && colNumber <= 10) {
+                    cell.alignment = { horizontal: 'right' };
+                }
+
+                // Add background color for new order rows
+                if (isNewOrder && colNumber <= 3) {
+                    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF3F4F6' } };
+                }
+            });
+
+            currentOrderNumber = order.order_number;
+            currentRow++;
+        });
+
+        // Add summary totals at the bottom
+        if (orders.length > 0) {
+            currentRow++; // Empty row
+            const summaryRow = sheet.getRow(currentRow);
+            
+            // Calculate unique order totals (to avoid counting same order multiple times)
+            const uniqueOrders = {};
+            orders.forEach(order => {
+                uniqueOrders[order.order_number] = parseFloat(order.order_total);
+            });
+            const grandTotal = Object.values(uniqueOrders).reduce((sum, total) => sum + total, 0);
+            const totalItems = orders.reduce((sum, order) => sum + parseFloat(order.total_price), 0);
+
+            summaryRow.values = [
+                '', '', '', '', '', '', '', 'TOTALS:',
+                totalItems.toFixed(2),
+                grandTotal.toFixed(2),
+                ''
+            ];
+            
+            summaryRow.eachCell((cell, colNumber) => {
+                cell.font = { bold: true, size: 12 };
+                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE5E7EB' } };
+                cell.border = {
+                    top: { style: 'double' },
+                    bottom: { style: 'double' },
+                    left: { style: 'thin' },
+                    right: { style: 'thin' }
+                };
+                if (colNumber >= 8) {
+                    cell.alignment = { horizontal: 'right' };
+                }
+            });
+        }
+
+        // Set column widths
+        sheet.columns = [
+            { width: 12 },  // Order Date
+            { width: 14 },  // Order No
+            { width: 15 },  // Invoice No
+            { width: 14 },  // Product Code
+            { width: 14 },  // Purchase Type
+            { width: 12 },  // Ordered Qty
+            { width: 12 },  // Received Qty
+            { width: 14 },  // Unit Price
+            { width: 14 },  // Item Total
+            { width: 14 },  // Order Total
+            { width: 15 }   // Created By
+        ];
+
+        // Send file
+        const fileName = `purchase_orders_${new Date().toISOString().split('T')[0]}.xlsx`;
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+
+        await workbook.xlsx.write(res);
+        res.end();
+    } catch (error) {
+        next(error);
+    }
+};
+
 module.exports = {
     getAllPurchaseOrders,
     getPurchaseOrderById,
@@ -448,5 +690,6 @@ module.exports = {
     approvePurchaseOrder,
     receivePurchaseOrder,
     cancelPurchaseOrder,
-    getEmptyStock
+    getEmptyStock,
+    exportPurchaseOrdersToExcel
 };

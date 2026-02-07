@@ -1,4 +1,4 @@
-export const formatDate = (dateString, separator = '-') => {
+export const formatDate = (dateString, separator = '/') => {
     if (!dateString) return '';
     const date = new Date(dateString);
 
@@ -9,3 +9,4 @@ export const formatDate = (dateString, separator = '-') => {
     const year = date.getFullYear();
     return `${day}${separator}${month}${separator}${year}`;
 };
+

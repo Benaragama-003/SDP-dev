@@ -4,13 +4,15 @@ import AdminSidebar from '../../components/AdminSidebar';
 import { ArrowLeft, Plus, Trash2, Loader2, ShoppingCart } from 'lucide-react';
 import { productApi, purchaseOrderApi } from '../../services/api';
 import '../../styles/Invoice.css';
+import DateInput from '../../components/DateInput';
+
 
 const PurchaseOrderCreate = () => {
     const navigate = useNavigate();
     const [loading, setLoading] = useState(true);
     const [submitting, setSubmitting] = useState(false);
     const [products, setProducts] = useState([]);
-    
+
     const [formData, setFormData] = useState({
         expected_date: '',
         supplier_contact: '',
@@ -57,18 +59,18 @@ const PurchaseOrderCreate = () => {
         setFormData(prev => {
             const newItems = [...prev.items];
             newItems[index] = { ...newItems[index], [field]: value };
-            
+
             // Auto-fill unit price when product is selected
             if (field === 'product_id' || field === 'purchase_type') {
                 const product = products.find(p => p.product_id === (field === 'product_id' ? value : newItems[index].product_id));
                 if (product) {
                     const purchaseType = field === 'purchase_type' ? value : newItems[index].purchase_type;
-                    newItems[index].unit_price = purchaseType === 'FILLED' 
-                        ? product.filled_purchase_price 
+                    newItems[index].unit_price = purchaseType === 'FILLED'
+                        ? product.filled_purchase_price
                         : product.new_purchase_price;
                 }
             }
-            
+
             return { ...prev, items: newItems };
         });
     };
@@ -79,7 +81,7 @@ const PurchaseOrderCreate = () => {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        
+
         if (formData.items.length === 0) {
             alert('Please add at least one item');
             return;
@@ -143,8 +145,8 @@ const PurchaseOrderCreate = () => {
                 <main className="invoice-main">
                     <div className="page-header">
                         <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-                            <button 
-                                className="btn btn-secondary" 
+                            <button
+                                className="btn btn-secondary"
                                 onClick={() => navigate('/admin/purchase-orders')}
                                 style={{ padding: '8px 12px' }}
                             >
@@ -161,17 +163,16 @@ const PurchaseOrderCreate = () => {
                         <div className="table-container" style={{ marginBottom: '20px' }}>
                             <div style={{ padding: '20px' }}>
                                 <h3 style={{ marginBottom: '20px' }}>Order Details</h3>
-                                
+
                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '20px' }}>
                                     <div>
                                         <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500' }}>
                                             Expected Delivery Date *
                                         </label>
-                                        <input
-                                            type="date"
+                                        <DateInput
                                             required
                                             value={formData.expected_date}
-                                            onChange={(e) => setFormData(prev => ({ ...prev, expected_date: e.target.value }))}
+                                            onChange={(value) => setFormData(prev => ({ ...prev, expected_date: value }))}
                                             min={new Date().toISOString().split('T')[0]}
                                             style={{
                                                 width: '100%',
@@ -208,8 +209,8 @@ const PurchaseOrderCreate = () => {
                             <div style={{ padding: '20px' }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                                     <h3>Order Items</h3>
-                                    <button 
-                                        type="button" 
+                                    <button
+                                        type="button"
                                         className="btn btn-primary"
                                         onClick={addItem}
                                     >
@@ -219,9 +220,9 @@ const PurchaseOrderCreate = () => {
                                 </div>
 
                                 {formData.items.length === 0 ? (
-                                    <div style={{ 
-                                        textAlign: 'center', 
-                                        padding: '40px', 
+                                    <div style={{
+                                        textAlign: 'center',
+                                        padding: '40px',
                                         backgroundColor: '#f8fafc',
                                         borderRadius: '8px',
                                         border: '2px dashed #ddd'
@@ -350,16 +351,16 @@ const PurchaseOrderCreate = () => {
                         </div>
 
                         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '15px' }}>
-                            <button 
-                                type="button" 
+                            <button
+                                type="button"
                                 className="btn btn-secondary"
                                 onClick={() => navigate('/admin/purchase-orders')}
                                 disabled={submitting}
                             >
                                 Cancel
                             </button>
-                            <button 
-                                type="submit" 
+                            <button
+                                type="submit"
                                 className="btn btn-primary"
                                 disabled={submitting || formData.items.length === 0}
                             >

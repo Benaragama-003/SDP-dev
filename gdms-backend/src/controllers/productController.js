@@ -143,33 +143,71 @@ const updateProduct = async (req, res, next) => {
 
     try {
         const pool = await getConnection();
-        
-        // Check product exists
+
+        // Verify product exists
         const [existing] = await pool.execute(
             'SELECT * FROM products WHERE product_id = ?',
             [id]
         );
-        
+
         if (existing.length === 0) {
             return errorResponse(res, 404, 'Product not found');
         }
 
-        await pool.execute(
-            `UPDATE products SET 
-                filled_purchase_price = COALESCE(?, filled_purchase_price),
-                new_purchase_price = COALESCE(?, new_purchase_price),
-                filled_selling_price = COALESCE(?, filled_selling_price),
-                new_selling_price = COALESCE(?, new_selling_price)
-             WHERE product_id = ?`,
-            [filled_purchase_price, new_purchase_price, filled_selling_price, new_selling_price, id]
+        // Helper: treat empty string/null/undefined as "not provided" and parse numbers safely
+        const tryParseNumber = (v) => {
+            if (v === '' || v === null || v === undefined) return null;
+            // Accept numbers or numeric strings
+            const n = Number(v);
+            if (Number.isFinite(n)) return n;
+            // fallback to parseFloat for loose input
+            const p = parseFloat(String(v));
+            return Number.isFinite(p) ? p : null;
+        };
+
+        const updates = [];
+        const values = [];
+
+        const mapping = [
+            ['filled_purchase_price', filled_purchase_price],
+            ['new_purchase_price', new_purchase_price],
+            ['filled_selling_price', filled_selling_price],
+            ['new_selling_price', new_selling_price],
+        ];
+
+        for (const [column, rawValue] of mapping) {
+            const parsed = tryParseNumber(rawValue);
+            if (parsed !== null) {
+                updates.push(`${column} = ?`);
+                values.push(parsed);
+            }
+        }
+
+        // No valid numeric fields provided
+        if (updates.length === 0) {
+            return successResponse(res, 200, 'No changes to update');
+        }
+
+        // Add product id for WHERE clause
+        values.push(id);
+
+        // Execute update and inspect result to ensure rows were affected
+        const [result] = await pool.execute(
+            `UPDATE products SET ${updates.join(', ')} WHERE product_id = ?`,
+            values
         );
+
+        // result.affectedRows should indicate whether DB changed
+        if (result && result.affectedRows === 0) {
+            // No rows updated - possibly same values or concurrency issue
+            return successResponse(res, 200, 'Request processed but no rows were changed');
+        }
 
         return successResponse(res, 200, 'Product updated successfully');
     } catch (error) {
         next(error);
     }
 };
-
 // Toggle product status (ACTIVE/INACTIVE)
 const toggleProductStatus = async (req, res, next) => {
     const { id } = req.params;

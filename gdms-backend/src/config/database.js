@@ -22,12 +22,12 @@ const getConnection = async () => {
       pool = mysql.createPool(dbConfig);
       // Test the connection
       const connection = await pool.getConnection();
-      console.log('✅ Database connection established');
+      console.log('Database connection established');
       connection.release();
     }
     return pool;
   } catch (error) {
-    console.error('❌ Database connection failed:', error.message);
+    console.error('Database connection failed:', error.message);
     throw error;
   }
 };

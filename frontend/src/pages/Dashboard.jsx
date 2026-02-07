@@ -4,10 +4,10 @@ import AdminDashboard from './admin/AdminDashboard';
 import Sidebar from '../components/Sidebar';
 import '../styles/Dashboard.css';
 import { CreditCard, Truck, Package, DollarSign, Store } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
+import { dashboardApi } from '../services/api';
 
 const Dashboard = () => {
-    const { user, isAdmin } = useAuth();
+    const { isAdmin } = useAuth();
     const [stats, setStats] = useState(null);
 
     useEffect(() => {
@@ -27,15 +27,12 @@ const Dashboard = () => {
         return <AdminDashboard />;
     }
 
-    // Supervisor Dashboard
     const renderStats = [
-        { title: 'Total Sales', value: stats?.totalSales?.toLocaleString(), icon: <CreditCard size={20} />, color: '#4facfe' },
-        { title: 'Credit', value: stats?.credit?.toLocaleString(), icon: <DollarSign size={20} />, color: '#00f2fe' },
-        { title: 'invoices', value: stats?.invoices?.toLocaleString(), icon: <Truck size={20} />, color: '#43e97b' },
-        { title: 'Stock', value: stats?.stock?.toLocaleString(), icon: <Package size={20} />, color: '#fa709a' },
-        { title: 'Active Dealers', value: stats?.activeDealers?.toLocaleString(), icon: <Store size={20} />, color: '#70faa7ff' },
+        { title: 'Monthly Sales', value: stats?.monthlySales?.toLocaleString() || '0', icon: <CreditCard size={20} />, color: '#4facfe' },
+        { title: 'Credits to Collect', value: stats?.creditsToCollect?.toLocaleString() || '0', icon: <DollarSign size={20} />, color: '#00f2fe' },
+        { title: 'Total Invoices', value: stats?.totalInvoices?.toLocaleString() || '0', icon: <Truck size={20} />, color: '#43e97b' },
+        { title: 'Active Dealers', value: stats?.activeDealers?.toLocaleString() || '0', icon: <Store size={20} />, color: '#70faa7ff' },
     ];
-
     return (
         <>
             <Sidebar />
@@ -66,21 +63,23 @@ const Dashboard = () => {
                             </div>
                         ))}
                     </div>
+                    {stats?.stockByProduct && (
+                        <div className="stock-section">
+                            <h3>Current Inventory Stock</h3>
+                            <div className="stock-grid">
+                                {stats.stockByProduct.map((item, index) => (
+                                    <div key={index} className="stock-card">
+                                        <span className="stock-size">{item.cylinder_size}</span>
+                                        <span className="stock-quantity">{item.quantity}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
                 </main>
             </div>
         </>
     );
-};
-
-const getSalesTrendData = () => {
-    const data = [];
-    for (let i = 0; i < 7; i++) {
-        data.push({
-            date: new Date(Date.now() - (i * 86400000)).toISOString().split('T')[0],
-            sales: Math.floor(Math.random() * 1000),
-        });
-    }
-    return data;
 };
 
 export default Dashboard;
