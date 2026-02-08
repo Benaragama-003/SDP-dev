@@ -26,7 +26,7 @@ const PurchaseOrderCreate = () => {
     const fetchProducts = async () => {
         try {
             setLoading(true);
-            const response = await productApi.getAllProducts();
+            const response = await productApi.getActiveProducts();
             setProducts(response.data.data || []);
         } catch (error) {
             console.error('Failed to fetch products:', error);

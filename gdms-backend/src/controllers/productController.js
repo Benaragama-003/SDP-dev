@@ -23,7 +23,7 @@ const recordInventoryMovement = async (connection, {
     return movement_id;
 };
 
-// Inventory summary grouped by size
+// Inventory summary grouped by size (FOR ADMIN - shows all products)
 const getInventorySummary = async (req, res, next) => {
     try {
         const pool = await getConnection();
@@ -39,6 +39,30 @@ const getInventorySummary = async (req, res, next) => {
             FROM products p
             LEFT JOIN inventory i ON p.product_id = i.product_id
             GROUP BY p.product_id, p.cylinder_size, p.status
+            ORDER BY CAST(REGEXP_REPLACE(p.cylinder_size, '[^0-9.]', '') AS DECIMAL(10,2))
+        `);
+        return successResponse(res, 200, 'Inventory summary retrieved', rows);
+    } catch (error) {
+        next(error);
+    }
+};
+
+// ✅ NEW FUNCTION - Inventory summary for SUPERVISORS (ACTIVE products only)
+const getInventorySummaryForSupervisor = async (req, res, next) => {
+    try {
+        const pool = await getConnection();
+        // Show ONLY ACTIVE products for supervisors
+        const [rows] = await pool.execute(`
+            SELECT 
+                p.product_id,
+                p.cylinder_size,
+                MAX(CASE WHEN i.product_type = 'FILLED' THEN i.quantity ELSE 0 END) as filled,
+                MAX(CASE WHEN i.product_type = 'EMPTY' THEN i.quantity ELSE 0 END) as \`empty\`,
+                MAX(CASE WHEN i.product_type = 'DAMAGED' THEN i.quantity ELSE 0 END) as damaged
+            FROM products p
+            LEFT JOIN inventory i ON p.product_id = i.product_id
+            WHERE p.status = 'ACTIVE'
+            GROUP BY p.product_id, p.cylinder_size
             ORDER BY CAST(REGEXP_REPLACE(p.cylinder_size, '[^0-9.]', '') AS DECIMAL(10,2))
         `);
         return successResponse(res, 200, 'Inventory summary retrieved', rows);
@@ -65,9 +89,16 @@ const getAllProducts = async (req, res, next) => {
 const getActiveProducts = async (req, res, next) => {
     try {
         const pool = await getConnection();
-        const [products] = await pool.execute(
-            'SELECT * FROM products WHERE status = "ACTIVE" ORDER BY cylinder_size'
-        );
+        const [products] = await pool.execute(`
+            SELECT 
+                p.*,
+                COALESCE(empty_inv.quantity, 0) as empty_stock
+            FROM products p
+            LEFT JOIN inventory empty_inv ON p.product_id = empty_inv.product_id 
+                AND empty_inv.product_type = 'EMPTY'
+            WHERE p.status = 'ACTIVE' 
+            ORDER BY cylinder_size
+        `);
         return successResponse(res, 200, 'Active products retrieved successfully', products);
     } catch (error) {
         next(error);
@@ -208,6 +239,7 @@ const updateProduct = async (req, res, next) => {
         next(error);
     }
 };
+
 // Toggle product status (ACTIVE/INACTIVE)
 const toggleProductStatus = async (req, res, next) => {
     const { id } = req.params;
@@ -719,6 +751,7 @@ const exportInventoryToExcel = async (req, res, next) => {
 
 module.exports = {
     getInventorySummary,
+    getInventorySummaryForSupervisor, 
     getAllProducts,
     getActiveProducts,
     createProduct,

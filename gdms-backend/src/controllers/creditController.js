@@ -11,6 +11,10 @@ const getAllCredits = async (req, res, next) => {
         const pool = await getConnection();
         
         // Get aggregated credit data per dealer
+        // NOTE: previously the LEFT JOIN limited rows to remaining_balance > 0 which made
+        // total_credit sum only outstanding amounts. Remove that condition and compute
+        // remaining/outstanding using conditional aggregation so total_credit represents
+        // the full credit issued amount.
         const [credits] = await pool.execute(`
             SELECT 
                 d.dealer_id,
@@ -18,17 +22,17 @@ const getAllCredits = async (req, res, next) => {
                 d.contact_number,
                 d.route,
                 d.credit_limit,
-                COUNT(ct.credit_id) as total_invoices,
+                COUNT(DISTINCT ct.credit_id) as total_invoices,
                 COALESCE(SUM(ct.credit_amount), 0) as total_credit,
                 COALESCE(SUM(ct.settled_amount), 0) as total_settled,
-                COALESCE(SUM(ct.remaining_balance), 0) as total_remaining,
+                COALESCE(SUM(CASE WHEN ct.remaining_balance > 0 THEN ct.remaining_balance ELSE 0 END), 0) as total_remaining,
                 COALESCE(SUM(CASE WHEN ct.status = 'OVERDUE' THEN ct.remaining_balance ELSE 0 END), 0) as total_overdue,
-                MIN(CASE WHEN ct.remaining_balance > 0 THEN ct.due_date END) as nearest_due_date
+                MIN(CASE WHEN ct.remaining_balance > 0 THEN ct.due_date ELSE NULL END) as nearest_due_date
             FROM dealers d
-            LEFT JOIN credit_transactions ct ON d.dealer_id = ct.dealer_id AND ct.remaining_balance > 0
+            LEFT JOIN credit_transactions ct ON d.dealer_id = ct.dealer_id
             WHERE d.status = 'ACTIVE'
             GROUP BY d.dealer_id, d.dealer_name, d.contact_number, d.route, d.credit_limit
-            HAVING total_remaining > 0 OR total_credit > 0
+            HAVING total_credit > 0 OR total_remaining > 0
             ORDER BY total_overdue DESC, total_remaining DESC
         `);
 

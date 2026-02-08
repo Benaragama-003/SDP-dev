@@ -8,7 +8,7 @@ const DateInput = ({
     min,
     max,
     required,
-    placeholder = "DD/MM/YYYY",
+    placeholder = "DD-MM-YYYY",
     className,
     style
 }) => {

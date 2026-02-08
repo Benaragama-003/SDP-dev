@@ -189,7 +189,7 @@ const AdminDispatch = () => {
                             <>
                             <div className="form-grid">
                                 <div className="form-field">
-                                    <label>Select Lorry* {lorries.length === 0 && <span style={{ color: '#999', fontSize: '12px' }}>(No available lorries)</span>}</label>
+                                    <label>Select Lorry* {lorries.length === 0 && <span style={{ color: '#999', fontSize: '12px' }}>(None available)</span>}</label>
                                     <select required value={selectedLorry} onChange={(e) => setSelectedLorry(e.target.value)}>
                                         <option value="">Choose a lorry</option>
                                         {lorries.map(lorry => (
@@ -201,7 +201,7 @@ const AdminDispatch = () => {
                                 </div>
 
                                 <div className="form-field">
-                                    <label>Select Supervisor* {supervisors.length === 0 && <span style={{ color: '#999', fontSize: '12px' }}>(No available supervisors)</span>}</label>
+                                    <label>Select Supervisor* {supervisors.length === 0 && <span style={{ color: '#999', fontSize: '12px' }}>(None available)</span>}</label>
                                     <select required value={selectedSupervisor} onChange={(e) => setSelectedSupervisor(e.target.value)}>
                                         <option value="">Choose supervisor</option>
                                         {supervisors.map(sup => (
@@ -326,7 +326,7 @@ const AdminDispatch = () => {
                                 <table className="data-table">
                                     <thead>
                                         <tr>
-                                            <th>Dispatch ID</th>
+                                            <th>Dispatch No</th>
                                             <th>Date</th>
                                             <th>Lorry</th>
                                             <th>Supervisor</th>
@@ -345,7 +345,7 @@ const AdminDispatch = () => {
                                         ) : (
                                         dispatches.map((dispatch) => (
                                             <tr key={dispatch.dispatch_id}>
-                                                <td style={{ fontWeight: '600' }}>{dispatch.dispatch_id}</td>
+                                                <td style={{ fontWeight: '600' }}>{dispatch.dispatch_number}</td>
                                                 <td>{formatDate(dispatch.dispatch_date)}</td>
                                                 <td>{dispatch.plate_number}</td>
                                                 <td>{dispatch.supervisor_name}</td>

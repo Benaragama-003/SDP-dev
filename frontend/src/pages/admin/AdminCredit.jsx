@@ -255,7 +255,7 @@ const AdminCredit = () => {
                                             <tr key={account.dealer_id}>
                                                 <td>
                                                     <div style={{ fontWeight: '600' }}>{account.dealer_name}</div>
-                                                    <div style={{ fontSize: '12px', color: '#666' }}>{account.dealer_id}</div>
+                                                    
                                                 </td>
                                                 <td>{account.route || '-'}</td>
                                                 <td>{account.total_invoices}</td>

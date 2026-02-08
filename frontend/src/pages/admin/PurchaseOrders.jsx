@@ -229,10 +229,14 @@ function PurchaseOrders() {
         );
     };
 
-    const filtered = orders.filter(o =>
-        o.order_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        o.supplier?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const filtered = orders.filter(o => {
+        const text = searchTerm.trim().toLowerCase();
+        const matchesText = !text || (
+            o.order_number?.toLowerCase().includes(text) ||
+            o.supplier?.toLowerCase().includes(text)
+            );
+        return matchesText;
+    });
 
     const formatCurrency = (amount) => {
         return new Intl.NumberFormat('en-LK', { style: 'currency', currency: 'LKR' }).format(amount);
@@ -326,7 +330,7 @@ function PurchaseOrders() {
 
                                     <div style={{ marginBottom: '15px' }}>
                                         <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500' }}>
-                                            Status (Optional)
+                                            Status 
                                         </label>
                                         <select
                                             value={exportFilters.status}
@@ -349,23 +353,7 @@ function PurchaseOrders() {
                                     </div>
 
                                     <div style={{ marginBottom: '15px' }}>
-                                        <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500' }}>
-                                            Supplier (Optional)
-                                        </label>
-                                        <input
-                                            type="text"
-                                            value={exportFilters.supplier}
-                                            onChange={e => setExportFilters(f => ({ ...f, supplier: e.target.value }))}
-                                            placeholder="Enter supplier name"
-                                            style={{
-                                                width: '100%',
-                                                padding: '10px',
-                                                borderRadius: '6px',
-                                                border: '1px solid #ddd',
-                                                fontSize: '14px'
-                                            }}
-                                            disabled={exportLoading}
-                                        />
+                                
                                     </div>
                                 </div>
 
@@ -414,8 +402,7 @@ function PurchaseOrders() {
                                 <input
                                     type="text"
                                     className="search-input"
-                                    placeholder="Search by PO number or supplier..."
-                                    value={searchTerm}
+                                    placeholder="Search by PO Number "                                    value={searchTerm}
                                     onChange={(e) => setSearchTerm(e.target.value)}
                                 />
                             </div>

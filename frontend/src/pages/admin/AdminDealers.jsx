@@ -215,7 +215,7 @@ const AdminDealers = () => {
                             <table className="data-table">
                                 <thead>
                                     <tr>
-                                        <th>Dealer ID</th>
+                                    
                                         <th>Name</th>
                                         <th>Contact</th>
                                         <th>Route</th>
@@ -228,7 +228,7 @@ const AdminDealers = () => {
                                 <tbody>
                                     {dealers.map((dealer) => (
                                         <tr key={dealer.dealer_id}>
-                                            <td>{dealer.dealer_id}</td>
+                                            
                                             <td>{dealer.dealer_name}</td>
                                             <td>{dealer.contact_number}</td>
                                             <td>{dealer.route || 'N/A'}</td>

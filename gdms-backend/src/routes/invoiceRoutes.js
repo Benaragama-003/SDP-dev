@@ -16,11 +16,13 @@ router.post('/', checkRole(['SUPERVISOR']), invoiceController.createInvoice);
 // 3. Report damage (Supervisor only)
 router.post('/report-damage', checkRole(['SUPERVISOR']), invoiceController.reportDamage);
 
-// 4. Admin only routes
-router.post('/accept-unload', checkRole(['ADMIN']), invoiceController.acceptUnload);
-router.post('/cancel-dispatch', checkRole(['ADMIN']), invoiceController.cancelDispatch);
+// 4. Soft delete invoice (Supervisor only)
+router.put('/:id/delete', checkRole(['SUPERVISOR']), invoiceController.softDeleteInvoice);
 
 // 5. Download invoice PDF
 router.get('/:id/pdf', invoiceController.downloadInvoicePDF);
+
+// 6. Export invoices to Excel (Admin only)
+router.get('/export', checkRole(['ADMIN']), invoiceController.exportInvoicesToExcel);
 
 module.exports = router;

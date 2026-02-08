@@ -4,6 +4,8 @@ import AdminSidebar from '../../components/AdminSidebar';
 import { Save, Loader2 } from 'lucide-react';
 import api from '../../services/api';
 import '../../styles/Dealers.css';
+import DateInput from '../../components/DateInput';
+
 
 const LorryAdd = () => {
     const navigate = useNavigate();
@@ -25,6 +27,12 @@ const LorryAdd = () => {
         e.preventDefault();
         setLoading(true);
         setError('');
+
+        if (!formData.vehicle_number || !formData.last_service_date) {
+            setError('Please fill all required fields.');
+            setLoading(false);
+            return;
+        }
 
         try {
             await api.post('/lorries', formData);
@@ -83,11 +91,11 @@ const LorryAdd = () => {
                                 </div>
                                 <div className="form-field">
                                     <label>Last Service Date*</label>
-                                    <input 
-                                        type="date" 
+                                    <DateInput
                                         name="last_service_date"
                                         value={formData.last_service_date}
-                                        onChange={handleChange}
+                                        onChange={(value) => setFormData(prev => ({ ...prev, last_service_date: value }))
+                                        }
                                         required
                                     />
                                     <small style={{ color: '#666', marginTop: '5px', display: 'block' }}>

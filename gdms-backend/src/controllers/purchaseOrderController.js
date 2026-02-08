@@ -158,6 +158,24 @@ const createPurchaseOrder = async (req, res, next) => {
         await connection.beginTransaction();
 
         try {
+            //VALIDATE: Only ACTIVE products can be ordered
+            for (const item of items) {
+                const [productCheck] = await connection.execute(
+                    'SELECT status, cylinder_size FROM products WHERE product_id = ?',
+                    [item.product_id]
+                );
+                
+                if (productCheck.length === 0) {
+                    await connection.rollback();
+                    return errorResponse(res, 400, `Product ${item.product_id} not found`);
+                }
+                
+                if (productCheck[0].status !== 'ACTIVE') {
+                    await connection.rollback();
+                    return errorResponse(res, 400, `Cannot order discontinued product: ${productCheck[0].cylinder_size}. This product is no longer active.`);
+                }
+            }
+
             const order_id = generateId('PO');
             
             // Generate sequential PO number (PO-01, PO-02, etc.)
@@ -507,7 +525,7 @@ const exportPurchaseOrdersToExcel = async (req, res, next) => {
             query += ' AND DATE(po.order_date) <= ?';
             params.push(end_date);
         }
-        if (status) {
+        if (status && status !== 'All Statuses' && status !== '') {
             query += ' AND po.status = ?';
             params.push(status);
         }
@@ -558,7 +576,7 @@ const exportPurchaseOrdersToExcel = async (req, res, next) => {
         sheet.getRow(6).eachCell(cell => {
             cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF6B21A8' } };
             cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
-            cell.alignment = { horizontal: 'center' };
+            cell.alignment = { horizontal: 'center', vertical: 'middle' };
             cell.border = {
                 top: { style: 'thin' },
                 bottom: { style: 'thin' },
@@ -567,58 +585,95 @@ const exportPurchaseOrdersToExcel = async (req, res, next) => {
             };
         });
 
-        // Track current order for grouping
-        let currentOrderNumber = null;
+        // Group orders by order_number to handle merging
+        const orderGroups = {};
+        orders.forEach(order => {
+            if (!orderGroups[order.order_number]) {
+                orderGroups[order.order_number] = [];
+            }
+            orderGroups[order.order_number].push(order);
+        });
+
+        // Track current row
         let currentRow = 7;
 
-        // Data rows
-        orders.forEach((order) => {
-            const row = sheet.getRow(currentRow);
+        // Data rows with merging
+        Object.keys(orderGroups).forEach(orderNumber => {
+            const orderItems = orderGroups[orderNumber];
+            const startRow = currentRow;
+            const itemCount = orderItems.length;
             
-            // Check if this is a new order (for order total display)
-            const isNewOrder = currentOrderNumber !== order.order_number;
-            
-            row.values = [
-                new Date(order.order_date).toLocaleDateString(),
-                order.order_number,
-                order.supplier_invoice_number || '-',
-                order.product_code,
-                order.purchase_type,
-                order.ordered_quantity,
-                order.received_quantity || 0,
-                parseFloat(order.unit_price).toFixed(2),
-                parseFloat(order.total_price).toFixed(2),
-                isNewOrder ? parseFloat(order.order_total).toFixed(2) : '', // Show order total only once
-                isNewOrder ? order.created_by_username : '' // Show username only once
-            ];
+            orderItems.forEach((order, index) => {
+                const row = sheet.getRow(currentRow);
+                
+                row.values = [
+                    new Date(order.order_date).toLocaleDateString(),
+                    order.order_number,
+                    order.supplier_invoice_number || '-',
+                    order.product_code,
+                    order.purchase_type,
+                    order.ordered_quantity,
+                    order.received_quantity || 0,
+                    parseFloat(order.unit_price).toFixed(2),
+                    parseFloat(order.total_price).toFixed(2),
+                    parseFloat(order.order_total).toFixed(2),
+                    order.created_by_username
+                ];
 
-            row.eachCell((cell, colNumber) => {
-                cell.border = {
-                    top: { style: 'thin' },
-                    bottom: { style: 'thin' },
-                    left: { style: 'thin' },
-                    right: { style: 'thin' }
-                };
+                row.eachCell((cell, colNumber) => {
+                    cell.border = {
+                        top: { style: 'thin' },
+                        bottom: { style: 'thin' },
+                        left: { style: 'thin' },
+                        right: { style: 'thin' }
+                    };
+                    
+                    cell.alignment = { vertical: 'middle' };
 
-                // Highlight received quantity if doesn't match ordered
-                if (colNumber === 7 && order.received_quantity !== order.ordered_quantity) {
-                    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEF3C7' } };
-                    cell.font = { bold: true, color: { argb: 'FFD97706' } };
-                }
+                    // Highlight received quantity if doesn't match ordered
+                    if (colNumber === 7 && order.received_quantity !== order.ordered_quantity) {
+                        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEF3C7' } };
+                        cell.font = { bold: true, color: { argb: 'FFD97706' } };
+                    }
 
-                // Format currency columns (right align)
-                if (colNumber >= 8 && colNumber <= 10) {
-                    cell.alignment = { horizontal: 'right' };
-                }
+                    // Format currency columns (right align)
+                    if (colNumber >= 8 && colNumber <= 10) {
+                        cell.alignment = { horizontal: 'right', vertical: 'middle' };
+                    }
 
-                // Add background color for new order rows
-                if (isNewOrder && colNumber <= 3) {
-                    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF3F4F6' } };
-                }
+                    // Add background color for order info columns
+                    if (colNumber <= 3) {
+                        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF3F4F6' } };
+                    }
+                });
+
+                currentRow++;
             });
 
-            currentOrderNumber = order.order_number;
-            currentRow++;
+            // Merge cells for orders with multiple items
+            if (itemCount > 1) {
+                const endRow = currentRow - 1;
+                
+                // Merge Order Date (Column A)
+                sheet.mergeCells(`A${startRow}:A${endRow}`);
+                sheet.getCell(`A${startRow}`).alignment = { horizontal: 'center', vertical: 'middle' };
+                
+                // Merge Order No (Column B)
+                sheet.mergeCells(`B${startRow}:B${endRow}`);
+                sheet.getCell(`B${startRow}`).alignment = { horizontal: 'center', vertical: 'middle' };
+                
+                // Merge Invoice No (Column C)
+                sheet.mergeCells(`C${startRow}:C${endRow}`);
+                sheet.getCell(`C${startRow}`).alignment = { horizontal: 'center', vertical: 'middle' };
+                
+                // Merge Order Total (Column J)
+                sheet.mergeCells(`J${startRow}:J${endRow}`);
+                sheet.getCell(`J${startRow}`).alignment = { horizontal: 'right', vertical: 'middle' };
+                
+                // Merge Created By (Column K)
+                sheet.mergeCells(`K${startRow}:K${endRow}`);
+                sheet.getCell(`K${startRow}`).alignment = { horizontal: 'center', vertical: 'middle' };
+            }
         });
 
         // Add summary totals at the bottom

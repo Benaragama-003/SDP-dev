@@ -149,7 +149,6 @@ const AdminCheques = () => {
                         <table className="data-table">
                             <thead>
                                 <tr>
-                                    <th>Cheque ID</th>
                                     <th>Dealer</th>
                                     <th>Cheque Number</th>
                                     <th>Amount</th>
@@ -169,7 +168,6 @@ const AdminCheques = () => {
                                     const status = getStatusBadge(cheque.clearance_status);
                                     return (
                                     <tr key={cheque.cheque_payment_id}>
-                                        <td>{cheque.cheque_payment_id}</td>
                                         <td>{cheque.dealer_name}</td>
                                         <td>{cheque.cheque_number}</td>
                                         <td>Rs. {parseFloat(cheque.amount || 0).toLocaleString()}</td>

@@ -12,15 +12,16 @@ const getMySales = async (req, res) => {
             SELECT 
                 (SELECT COUNT(*) FROM invoices i
                  JOIN dispatches d ON d.dispatch_id = i.dispatch_id
-                 WHERE d.supervisor_id = ? AND DATE(i.invoice_date) = ?) AS total_invoices,
+                 WHERE d.supervisor_id = ? AND DATE(i.invoice_date) = ? AND i.is_deleted = FALSE) AS total_invoices,
                 (SELECT COALESCE(SUM(i.total_amount), 0) FROM invoices i
                  JOIN dispatches d ON d.dispatch_id = i.dispatch_id
-                 WHERE d.supervisor_id = ? AND DATE(i.invoice_date) = ?) AS total_revenue,
+                 WHERE d.supervisor_id = ? AND DATE(i.invoice_date) = ? AND i.is_deleted = FALSE
+                ) AS total_revenue,
                 (SELECT COALESCE(SUM(ii.quantity), 0) 
                  FROM invoice_items ii 
                  JOIN invoices inv ON inv.invoice_id = ii.invoice_id
                  JOIN dispatches disp ON disp.dispatch_id = inv.dispatch_id
-                 WHERE disp.supervisor_id = ? AND DATE(inv.invoice_date) = ?) AS total_cylinders
+                 WHERE disp.supervisor_id = ? AND DATE(inv.invoice_date) = ? AND inv.is_deleted = FALSE) AS total_cylinders
         `, [supervisorId, targetDate, supervisorId, targetDate, supervisorId, targetDate]);
 
         // Payment breakdown
@@ -31,7 +32,7 @@ const getMySales = async (req, res) => {
             FROM payments p
             JOIN invoices i ON i.invoice_id = p.invoice_id
             JOIN dispatches d ON d.dispatch_id = i.dispatch_id
-            WHERE d.supervisor_id = ? AND DATE(i.invoice_date) = ?
+            WHERE d.supervisor_id = ? AND DATE(i.invoice_date) = ? AND i.is_deleted = FALSE
                 AND p.status != 'CANCELLED'
             GROUP BY p.payment_method
         `, [supervisorId, targetDate]);
@@ -55,7 +56,7 @@ const getMySales = async (req, res) => {
                        COUNT(*) AS invoice_count,
                        SUM(i.total_amount) AS total_amount
                 FROM invoices i
-                WHERE DATE(i.invoice_date) = ?
+                WHERE DATE(i.invoice_date) = ? AND i.is_deleted = FALSE
                 GROUP BY i.dispatch_id
             ) inv_totals ON inv_totals.dispatch_id = d.dispatch_id
             LEFT JOIN (
@@ -63,7 +64,7 @@ const getMySales = async (req, res) => {
                        SUM(ii.quantity) AS cylinders_sold
                 FROM invoice_items ii
                 JOIN invoices i ON i.invoice_id = ii.invoice_id
-                WHERE DATE(i.invoice_date) = ?
+                WHERE DATE(i.invoice_date) = ? AND i.is_deleted = FALSE
                 GROUP BY i.dispatch_id
             ) item_agg ON item_agg.dispatch_id = d.dispatch_id
             LEFT JOIN (
@@ -72,7 +73,7 @@ const getMySales = async (req, res) => {
                        SUM(CASE WHEN p.payment_method = 'CHEQUE' THEN p.amount ELSE 0 END) AS cheque
                 FROM payments p
                 JOIN invoices i ON i.invoice_id = p.invoice_id
-                WHERE p.status != 'CANCELLED' AND DATE(i.invoice_date) = ?
+                WHERE p.status != 'CANCELLED' AND DATE(i.invoice_date) = ? AND i.is_deleted = FALSE
                 GROUP BY i.dispatch_id
             ) pay_agg ON pay_agg.dispatch_id = d.dispatch_id
             WHERE d.supervisor_id = ? AND DATE(d.dispatch_date) = ?
@@ -90,7 +91,7 @@ const getMySales = async (req, res) => {
                 FROM invoice_items ii
                 JOIN invoices i ON i.invoice_id = ii.invoice_id
                 JOIN products p ON p.product_id = ii.product_id
-                WHERE i.dispatch_id = ? AND DATE(i.invoice_date) = ?
+                WHERE i.dispatch_id = ? AND DATE(i.invoice_date) = ? AND i.is_deleted = FALSE
                 GROUP BY p.cylinder_size, ii.sale_type
             `, [sale.dispatch_id, targetDate]);
             sale.items = items;
@@ -135,17 +136,17 @@ const getAllSales = async (req, res) => {
 
         if (date) {
             // If specific date is provided, use it
-            dateCondition = `DATE(i.invoice_date) = '${date}'`;
+            dateCondition = `DATE(i.invoice_date) = '${date}' AND i.is_deleted = FALSE`;
         } else if (range === 'today') {
-            dateCondition = 'DATE(i.invoice_date) = CURDATE()';
+            dateCondition = 'DATE(i.invoice_date) = CURDATE() AND i.is_deleted = FALSE';
         } else if (range === 'week') {
-            dateCondition = 'i.invoice_date >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)';
+            dateCondition = 'i.invoice_date >= DATE_SUB(CURDATE(), INTERVAL 7 DAY) AND i.is_deleted = FALSE';
         } else if (range === 'month') {
-            dateCondition = 'i.invoice_date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)';
+            dateCondition = 'i.invoice_date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY) AND i.is_deleted = FALSE';
         } else if (range === 'custom' && from && to) {
-            dateCondition = `DATE(i.invoice_date) BETWEEN '${from}' AND '${to}'`;
+            dateCondition = `DATE(i.invoice_date) BETWEEN '${from}' AND '${to}' AND i.is_deleted = FALSE`;
         } else {
-            dateCondition = 'DATE(i.invoice_date) = CURDATE()';
+            dateCondition = 'DATE(i.invoice_date) = CURDATE() AND i.is_deleted = FALSE';
         }
 
         // Summary stats (separate aggregations to avoid cartesian product)

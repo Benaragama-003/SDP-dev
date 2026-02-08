@@ -245,7 +245,7 @@ const InvoiceCreate = () => {
             };
             
             const response = await invoiceApi.create(payload);
-            alert(`Invoice created successfully! Invoice ID: ${response.data.data.invoice_id}`);
+            alert(`Invoice created successfully! Invoice : ${response.data.data.invoice_number}`);
             
             // Reset form
             setInvoiceItems([]);
@@ -353,7 +353,7 @@ const InvoiceCreate = () => {
                     }}>
                         <Truck size={24} color={canCreateInvoice ? '#388e3c' : '#999'} />
                         <div>
-                            <div style={{ fontWeight: '600', color: canCreateInvoice ? '#2e7d32' : '#666' }}>Dispatch: {activeDispatch.dispatch_id}</div>
+                            <div style={{ fontWeight: '600', color: canCreateInvoice ? '#2e7d32' : '#666' }}>Dispatch: {activeDispatch.dispatch_number}</div>
                             <div style={{ fontSize: '13px', color: canCreateInvoice ? '#388e3c' : '#999' }}>
                                 Lorry: {activeDispatch.plate_number} • Route: {activeDispatch.route} • Status: {activeDispatch.status}
                             </div>
@@ -393,7 +393,7 @@ const InvoiceCreate = () => {
                                                     onMouseOver={(e) => e.target.style.background = '#f5f5f5'}
                                                     onMouseOut={(e) => e.target.style.background = 'white'}
                                                 >
-                                                    <strong>{dealer.dealer_name}</strong> <span style={{ fontSize: '12px', color: '#666' }}>({dealer.dealer_id})</span>
+                                                    <strong>{dealer.dealer_name}</strong> <span style={{ fontSize: '12px', color: '#666' }}></span>
                                                 </div>
                                             ))}
                                             {!loadingDealers && filteredDealers.length === 0 && (

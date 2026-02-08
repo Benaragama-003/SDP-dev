@@ -2,6 +2,30 @@ const { getConnection } = require('../config/database');
 const { generateId } = require('../utils/generateId');
 const { successResponse, errorResponse } = require('../utils/responseHelper');
 const PDFDocument = require('pdfkit');
+const ExcelJS = require('exceljs');
+
+// Helper function to generate next sequential INV number
+const getNextINVNumber = async (connection) => {
+    const [lastINV] = await connection.execute(
+        `SELECT invoice_number FROM invoices 
+         ORDER BY created_at DESC, invoice_number DESC LIMIT 1`
+    );
+    
+    let nextNumber = 1;
+    
+    if (lastINV.length > 0) {
+        const lastInvoiceNumber = lastINV[0].invoice_number;
+        const match = lastInvoiceNumber.match(/INV-(\d+)/);
+        if (match) {
+            nextNumber = parseInt(match[1], 10) + 1;
+        }
+    }
+    
+    // Format: INV-01, INV-02, ..., INV-99, INV-100, INV-1000
+    const formattedNumber = nextNumber.toString().padStart(2, '0');
+    
+    return `INV-${formattedNumber}`;
+};
 
 const createInvoice = async (req, res, next) => {
     const { dealer_id, dispatch_id, items, payment_method, paid_amount, cheque_details } = req.body;
@@ -30,6 +54,8 @@ const createInvoice = async (req, res, next) => {
             
             const invoice_id = generateId('INV');
             let total_amount = 0;
+            // generate invoice number once and reuse (avoid calling getNextINVNumber twice)
+            const invoice_number = await getNextINVNumber(connection);
 
         // First calculate total amount
         for (const item of items) {
@@ -41,7 +67,7 @@ const createInvoice = async (req, res, next) => {
         await connection.execute(
             `INSERT INTO invoices (invoice_id, invoice_number, dealer_id, dispatch_id, subtotal, total_amount, payment_type, due_date)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-            [invoice_id, `INV-${Date.now().toString().slice(-6)}`, dealer_id, dispatch_id, total_amount, total_amount, payment_method, payment_method === 'CREDIT' ? new Date(Date.now() + 30*24*60*60*1000) : null]
+            [invoice_id, invoice_number, dealer_id, dispatch_id, total_amount, total_amount, payment_method, payment_method === 'CREDIT' ? new Date(Date.now() + 30*24*60*60*1000) : null]
         );
 
         // Step A: Process Items - Track sold_filled, sold_new, empty_collected
@@ -190,7 +216,7 @@ const createInvoice = async (req, res, next) => {
             await connection.execute('UPDATE supervisors SET achieved_sales = achieved_sales + ? WHERE supervisor_id = ?', [total_amount, supervisor_id]);
 
             await connection.commit();
-            return successResponse(res, 201, 'Invoice created successfully', { invoice_id, total_amount });
+            return successResponse(res, 201, 'Invoice created successfully', { invoice_number });
         } catch (error) {
             await connection.rollback();
             throw error;
@@ -252,20 +278,9 @@ const reportDamage = async (req, res, next) => {
     }
 };
 
-// 3. COMPLETE TRIP (Supervisor)
-const completeTrip = async (req, res, next) => {
-    const { dispatch_id } = req.params;
-    try {
-        const pool = await getConnection();
-        await pool.execute('UPDATE dispatches SET status = "AWAITING_UNLOAD" WHERE dispatch_id = ?', [dispatch_id]);
-        return successResponse(res, 200, 'Trip marked as completed. Awaiting admin unloading.');
-    } catch (error) {
-        next(error);
-    }
-};
-
-const acceptUnload = async (req, res, next) => {
-    const { dispatch_id } = req.body;
+const softDeleteInvoice = async (req, res, next) => {
+    const { id } = req.params;
+    const deletedBy = req.user.userId; // Get the user ID from the authenticated request
 
     try {
         const pool = await getConnection();
@@ -273,131 +288,93 @@ const acceptUnload = async (req, res, next) => {
         await connection.beginTransaction();
 
         try {
-            // Get lorry stock with new columns
-            const [lorryStock] = await connection.execute(
-                `SELECT ls.*, p.cylinder_size 
-                 FROM lorry_stock ls
-                 JOIN products p ON ls.product_id = p.product_id
-                 WHERE ls.dispatch_id = ?`,
-                [dispatch_id]
+            // 1. Get the invoice and verify it exists and isn't already deleted
+            const [invoiceRows] = await connection.execute(
+                'SELECT * FROM invoices WHERE invoice_id = ? AND is_deleted = FALSE', [id]
+            );
+            if (!invoiceRows.length) throw new Error('Invoice not found or already deleted');
+
+            const invoice = invoiceRows[0];
+
+            // 2. Get invoice items to reverse stock changes
+            const [items] = await connection.execute(
+                'SELECT * FROM invoice_items WHERE invoice_id = ?', [id]
             );
 
-            // Return stock to inventory
-            for (const stock of lorryStock) {
-                // Calculate what's returning
-                const remaining_filled = stock.loaded_quantity - (stock.sold_filled || 0) - (stock.sold_new || 0) - stock.damaged_quantity;
-                const empty_returning = stock.empty_collected || 0;
-                
-                // Return remaining FILLED cylinders to inventory
-                if (remaining_filled > 0) {
+            // 3. Reverse lorry_stock and dispatch_items for each item
+            for (const item of items) {
+                const is_refill = item.sale_type === 'FILLED';
+                if (is_refill) {
                     await connection.execute(
-                        `UPDATE inventory 
-                         SET quantity = quantity + ? 
-                         WHERE product_id = ? AND product_type = 'FILLED'`,
-                        [remaining_filled, stock.product_id]
+                        `UPDATE lorry_stock 
+                         SET sold_filled = sold_filled - ?, empty_collected = empty_collected - ?
+                         WHERE dispatch_id = ? AND product_id = ? AND product_type = 'FILLED'`,
+                        [item.quantity, item.empty_returned, invoice.dispatch_id, item.product_id]
                     );
-                }
-                
-                // Return EMPTY cylinders to inventory
-                if (empty_returning > 0) {
                     await connection.execute(
-                        `UPDATE inventory 
-                         SET quantity = quantity + ? 
-                         WHERE product_id = ? AND product_type = 'EMPTY'`,
-                        [empty_returning, stock.product_id]
+                        `UPDATE dispatch_items 
+                         SET sold_filled = sold_filled - ?, empty_collected = empty_collected - ?
+                         WHERE dispatch_id = ? AND product_id = ? AND product_type = 'FILLED'`,
+                        [item.quantity, item.empty_returned, invoice.dispatch_id, item.product_id]
                     );
-                }
-                
-                // Add DAMAGED to damaged inventory
-                if (stock.damaged_quantity > 0) {
+                } else {
                     await connection.execute(
-                        `UPDATE inventory 
-                         SET quantity = quantity + ? 
-                         WHERE product_id = ? AND product_type = 'DAMAGED'`,
-                        [stock.damaged_quantity, stock.product_id]
+                        `UPDATE lorry_stock SET sold_new = sold_new - ?
+                         WHERE dispatch_id = ? AND product_id = ? AND product_type = 'FILLED'`,
+                        [item.quantity, invoice.dispatch_id, item.product_id]
+                    );
+                    await connection.execute(
+                        `UPDATE dispatch_items SET sold_new = sold_new - ?
+                         WHERE dispatch_id = ? AND product_id = ? AND product_type = 'FILLED'`,
+                        [item.quantity, invoice.dispatch_id, item.product_id]
                     );
                 }
             }
 
-            // Update dispatch status
-            await connection.execute(
-                `UPDATE dispatches SET status = 'UNLOADED' WHERE dispatch_id = ?`,
-                [dispatch_id]
+            // 4. Reverse credit if applicable
+            const [creditRows] = await connection.execute(
+                'SELECT * FROM credit_transactions WHERE invoice_id = ?', [id]
             );
-
-            // Update lorry status
-            const [dispatch] = await connection.execute(
-                'SELECT lorry_id, supervisor_id FROM dispatches WHERE dispatch_id = ?',
-                [dispatch_id]
-            );
-            
-            await connection.execute(
-                `UPDATE lorries SET status = 'AVAILABLE' WHERE lorry_id = ?`,
-                [dispatch[0].lorry_id]
-            );
-            
-            await connection.execute(
-                `UPDATE supervisors SET status = 'AVAILABLE' WHERE supervisor_id = ?`,
-                [dispatch[0].supervisor_id]
-            );
-
-            await connection.commit();
-            return successResponse(res, 200, 'Dispatch unloaded successfully');
-        } catch (error) {
-            await connection.rollback();
-            throw error;
-        } finally {
-            connection.release();
-        }
-    } catch (error) {
-        next(error);
-    }
-};
-
-// 5. CANCEL PENDING DISPATCH (Admin)
-const cancelDispatch = async (req, res, next) => {
-    const { dispatch_id } = req.body;
-
-    try {
-        const pool = await getConnection();
-        const connection = await pool.getConnection();
-        await connection.beginTransaction();
-
-        try {
-            const [dispatch] = await connection.execute(
-                'SELECT status, supervisor_id, lorry_id FROM dispatches WHERE dispatch_id = ?', 
-                [dispatch_id]
-            );
-            
-            if (!dispatch.length || dispatch[0].status !== 'SCHEDULED') {
-                return errorResponse(res, 400, 'Only scheduled dispatches can be cancelled');
-            }
-            
-            const { supervisor_id, lorry_id } = dispatch[0];
-
-            // 1. Revert Lorry Stock back to Warehouse Inventory
-            const [truckItems] = await connection.execute(
-                'SELECT product_id, product_type, loaded_quantity FROM lorry_stock WHERE dispatch_id = ?', 
-                [dispatch_id]
-            );
-            
-            for (const item of truckItems) {
+            if (creditRows.length > 0) {
+                const credit = creditRows[0];
                 await connection.execute(
-                    'UPDATE inventory SET quantity = quantity + ? WHERE product_id = ? AND product_type = ?', 
-                    [item.loaded_quantity, item.product_id, item.product_type]
+                    'UPDATE dealers SET current_credit = current_credit - ? WHERE dealer_id = ?',
+                    [credit.remaining_balance, invoice.dealer_id]
+                );
+                await connection.execute(
+                    'DELETE FROM credit_settlements WHERE credit_id = ?', [credit.credit_id]
+                );
+                await connection.execute(
+                    'DELETE FROM credit_transactions WHERE invoice_id = ?', [id]
                 );
             }
-            
-            // 2. Delete lorry_stock records for this dispatch
-            await connection.execute('DELETE FROM lorry_stock WHERE dispatch_id = ?', [dispatch_id]);
 
-            // 3. Reset Statuses
-            await connection.execute('UPDATE dispatches SET status = "CANCELLED" WHERE dispatch_id = ?', [dispatch_id]);
-            await connection.execute('UPDATE lorries SET status = "AVAILABLE" WHERE lorry_id = ?', [lorry_id]);
-            await connection.execute('UPDATE supervisors SET status = "AVAILABLE" WHERE supervisor_id = ?', [supervisor_id]);
+            // 5. Delete payments (and cheque_payments via CASCADE)
+            await connection.execute('DELETE FROM payments WHERE invoice_id = ?', [id]);
+
+            // 6. Reverse supervisor achieved_sales
+            const [dispRows] = await connection.execute(
+                'SELECT supervisor_id FROM dispatches WHERE dispatch_id = ?', [invoice.dispatch_id]
+            );
+            if (dispRows.length > 0) {
+                await connection.execute(
+                    'UPDATE supervisors SET achieved_sales = achieved_sales - ? WHERE supervisor_id = ?',
+                    [invoice.total_amount, dispRows[0].supervisor_id]
+                );
+            }
+
+            // 7. Soft delete the invoice with deleted_by and deleted_at
+            await connection.execute(
+                `UPDATE invoices 
+                 SET is_deleted = TRUE, 
+                     deleted_by = ?, 
+                     deleted_at = NOW() 
+                 WHERE invoice_id = ?`, 
+                [deletedBy, id]
+            );
 
             await connection.commit();
-            return successResponse(res, 200, 'Dispatch cancelled and materials returned to warehouse');
+            return successResponse(res, 200, 'Invoice soft deleted and references reversed');
         } catch (error) {
             await connection.rollback();
             throw error;
@@ -413,11 +390,16 @@ const cancelDispatch = async (req, res, next) => {
 const getAllInvoices = async (req, res, next) => {
     try {
         const pool = await getConnection();
-        const [invoices] = await pool.execute(`
+        const userRole = req.user.role;
+        const userId = req.user.userId;
+
+        // Base query (exclude soft-deleted invoices)
+        let query = `
             SELECT i.*, 
                    d.dealer_name, 
                    CONCAT(u.first_name, ' ', u.last_name) as supervisor_name,
                    disp.lorry_id,
+                   disp.dispatch_number,
                    l.vehicle_number,
                    COALESCE((SELECT SUM(amount) FROM payments WHERE invoice_id = i.invoice_id AND status = 'COMPLETED'), 0) as total_paid,
                    COALESCE((SELECT SUM(amount) FROM payments WHERE invoice_id = i.invoice_id AND status = 'PENDING'), 0) as pending_paid,
@@ -427,23 +409,31 @@ const getAllInvoices = async (req, res, next) => {
             JOIN dispatches disp ON i.dispatch_id = disp.dispatch_id
             JOIN users u ON disp.supervisor_id = u.user_id
             LEFT JOIN lorries l ON disp.lorry_id = l.lorry_id
-            ORDER BY i.created_at DESC
-        `);
-        
-        // Fetch items for each invoice
+            WHERE i.is_deleted = FALSE
+        `;
+        const params = [];
+
+        // If requester is a SUPERVISOR, limit to invoices for their dispatches
+        if (userRole === 'SUPERVISOR') {
+            query += ' AND disp.supervisor_id = ?';
+            params.push(userId);
+        }
+
+        query += ' ORDER BY i.created_at DESC';
+
+        const [invoices] = await pool.execute(query, params);
+
+        // attach items as before
         for (const invoice of invoices) {
             const [items] = await pool.execute(`
-                SELECT 
-                    ii.*, 
-                    p.cylinder_size,
-                    p.product_code
+                SELECT ii.*, p.cylinder_size, p.product_code
                 FROM invoice_items ii
                 JOIN products p ON ii.product_id = p.product_id
                 WHERE ii.invoice_id = ?
             `, [invoice.invoice_id]);
             invoice.items = items;
         }
-        
+
         return successResponse(res, 200, 'Invoices retrieved', invoices);
     } catch (error) {
         next(error);
@@ -477,7 +467,7 @@ const downloadInvoicePDF = async (req, res, next) => {
         
         // Fetch invoice items
         const [items] = await pool.execute(`
-            SELECT ii.*, p.cylinder_size
+            SELECT ii.*, p.cylinder_size, p.product_code
             FROM invoice_items ii
             JOIN products p ON ii.product_id = p.product_id
             WHERE ii.invoice_id = ?
@@ -582,13 +572,380 @@ const downloadInvoicePDF = async (req, res, next) => {
     }
 };
 
+
+
+
+const exportInvoicesToExcel = async (req, res, next) => {
+    const { start_date, end_date, status, dealer_name } = req.query;
+
+    try {
+        const pool = await getConnection();
+
+        // Get invoices with items, dealer details, and payment information
+        let query = `
+            SELECT 
+                i.invoice_number,
+                DATE(i.invoice_date) as invoice_date,
+                d.dealer_name,
+                d.contact_number as dealer_contact,
+                disp.dispatch_number,
+                i.payment_type,
+                i.subtotal,
+                i.total_amount,
+                p.product_code,
+                ii.sale_type,
+                ii.quantity,
+                ii.unit_price,
+                ii.total_price,
+                ii.empty_returned,
+                i.is_deleted,
+                CONCAT(del_user.first_name, ' ', del_user.last_name) as deleted_by_name,
+                i.deleted_at,
+                CASE 
+                    WHEN i.payment_type = 'CREDIT' THEN 
+                        COALESCE((SELECT SUM(amount) 
+                                  FROM payments 
+                                  WHERE invoice_id = i.invoice_id 
+                                  AND status = 'CLEARED'), 0)
+                    ELSE i.total_amount
+                END as paid_amount,
+                i.payment_type as payment_method,
+                CASE 
+                    WHEN i.payment_type = 'CREDIT' THEN
+                        CASE 
+                            WHEN COALESCE((SELECT SUM(amount) 
+                                          FROM payments 
+                                          WHERE invoice_id = i.invoice_id 
+                                          AND status = 'CLEARED'), 0) >= i.total_amount 
+                            THEN 'Paid'
+                            WHEN COALESCE((SELECT SUM(amount) 
+                                          FROM payments 
+                                          WHERE invoice_id = i.invoice_id 
+                                          AND status = 'CLEARED'), 0) > 0 
+                            THEN 'Partial'
+                            ELSE 'Pending'
+                        END
+                    ELSE 'Paid'
+                END as payment_status
+            FROM invoices i
+            JOIN dealers d ON i.dealer_id = d.dealer_id
+            JOIN dispatches disp ON i.dispatch_id = disp.dispatch_id
+            JOIN invoice_items ii ON i.invoice_id = ii.invoice_id
+            JOIN products p ON ii.product_id = p.product_id
+            LEFT JOIN users del_user ON i.deleted_by = del_user.user_id
+            WHERE 1=1
+        `;
+        const params = [];
+
+        if (start_date) {
+            query += ' AND DATE(i.invoice_date) >= ?';
+            params.push(start_date);
+        }
+        if (end_date) {
+            query += ' AND DATE(i.invoice_date) <= ?';
+            params.push(end_date);
+        }
+        if (status && status !== 'All Status' && status !== '') {
+            // Map frontend status to payment status logic
+            if (status === 'Paid') {
+                query += ` AND (
+                    (i.payment_type != 'CREDIT') OR 
+                    (i.payment_type = 'CREDIT' AND 
+                     COALESCE((SELECT SUM(amount) FROM payments WHERE invoice_id = i.invoice_id AND status = 'CLEARED'), 0) >= i.total_amount)
+                )`;
+            } else if (status === 'Pending') {
+                query += ` AND i.payment_type = 'CREDIT' 
+                          AND COALESCE((SELECT SUM(amount) FROM payments WHERE invoice_id = i.invoice_id AND status = 'CLEARED'), 0) = 0`;
+            } else if (status === 'Partial') {
+                query += ` AND i.payment_type = 'CREDIT' 
+                          AND COALESCE((SELECT SUM(amount) FROM payments WHERE invoice_id = i.invoice_id AND status = 'CLEARED'), 0) > 0 
+                          AND COALESCE((SELECT SUM(amount) FROM payments WHERE invoice_id = i.invoice_id AND status = 'CLEARED'), 0) < i.total_amount`;
+            }
+        }
+        if (dealer_name) {
+            query += ' AND d.dealer_name LIKE ?';
+            params.push(`%${dealer_name}%`);
+        }
+
+        query += ' ORDER BY i.invoice_date DESC, i.invoice_number DESC, p.product_code';
+        
+        const [invoices] = await pool.execute(query, params);
+
+        // Create workbook
+        const workbook = new ExcelJS.Workbook();
+        const sheet = workbook.addWorksheet('Invoices');
+
+        // Company Header
+        const companyHeaders = [
+            'HIDELLANA DISTRIBUTORS (PVT) LTD',
+            'No. 164, Kudagama Road, Hidellana, Ratnapura',
+            'Tel: 045-2222865 | Reg No: PV 113085',
+            `Invoice Archive Report - Generated: ${new Date().toLocaleDateString()}`
+        ];
+
+        companyHeaders.forEach((text, idx) => {
+            sheet.mergeCells(`A${idx + 1}:O${idx + 1}`);
+            const row = sheet.getRow(idx + 1);
+            row.getCell(1).value = text;
+            row.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' };
+            row.getCell(1).font = idx === 0 ? { bold: true, size: 14 } : { size: 11 };
+        });
+
+        // Table headers at row 6
+        sheet.getRow(6).values = [
+            'Date',
+            'Invoice No',
+            'Dealer Name',
+            'Dispatch Ref',
+            'Product Code',
+            'Sale Type',
+            'Quantity',
+            'Empty Returned',
+            'Unit Price (Rs)',
+            'Item Total (Rs)',
+            'Invoice Total (Rs)',
+            'Paid Amount (Rs)',
+            'Payment Method',
+            'Status',
+            'Deleted By'
+        ];
+        
+        sheet.getRow(6).eachCell(cell => {
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF6B21A8' } };
+            cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+            cell.alignment = { horizontal: 'center', vertical: 'middle' };
+            cell.border = {
+                top: { style: 'thin' },
+                bottom: { style: 'thin' },
+                left: { style: 'thin' },
+                right: { style: 'thin' }
+            };
+        });
+
+        // Group invoices by invoice_number for merging
+        const invoiceGroups = {};
+        invoices.forEach(invoice => {
+            if (!invoiceGroups[invoice.invoice_number]) {
+                invoiceGroups[invoice.invoice_number] = [];
+            }
+            invoiceGroups[invoice.invoice_number].push(invoice);
+        });
+
+        let currentRow = 7;
+
+        // Data rows with merging
+        Object.keys(invoiceGroups).forEach(invoiceNumber => {
+            const invoiceItems = invoiceGroups[invoiceNumber];
+            const startRow = currentRow;
+            const itemCount = invoiceItems.length;
+            
+            invoiceItems.forEach((invoice, index) => {
+                const row = sheet.getRow(currentRow);
+                
+                row.values = [
+                    new Date(invoice.invoice_date).toLocaleDateString(),
+                    invoice.invoice_number,
+                    invoice.dealer_name,
+                    invoice.dispatch_number,
+                    invoice.product_code,
+                    invoice.sale_type,
+                    invoice.quantity,
+                    invoice.empty_returned || 0,
+                    parseFloat(invoice.unit_price).toFixed(2),
+                    parseFloat(invoice.total_price).toFixed(2),
+                    parseFloat(invoice.total_amount).toFixed(2),
+                    parseFloat(invoice.paid_amount).toFixed(2),
+                    invoice.payment_method,
+                    invoice.payment_status,
+                    invoice.is_deleted ? (invoice.deleted_by_name || 'N/A') : '-'
+                ];
+
+                row.eachCell((cell, colNumber) => {
+                    cell.border = {
+                        top: { style: 'thin' },
+                        bottom: { style: 'thin' },
+                        left: { style: 'thin' },
+                        right: { style: 'thin' }
+                    };
+                    
+                    cell.alignment = { vertical: 'middle' };
+
+                    // Format currency columns (right align)
+                    if (colNumber >= 9 && colNumber <= 12) {
+                        cell.alignment = { horizontal: 'right', vertical: 'middle' };
+                    }
+
+                    // Center align for quantities
+                    if (colNumber === 7 || colNumber === 8) {
+                        cell.alignment = { horizontal: 'center', vertical: 'middle' };
+                    }
+
+                    // Status color coding
+                    if (colNumber === 14) {
+                        if (invoice.payment_status === 'Paid') {
+                            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD1FAE5' } };
+                            cell.font = { bold: true, color: { argb: 'FF059669' } };
+                        } else if (invoice.payment_status === 'Pending') {
+                            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEE2E2' } };
+                            cell.font = { bold: true, color: { argb: 'FFDC2626' } };
+                        } else if (invoice.payment_status === 'Partial') {
+                            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEF3C7' } };
+                            cell.font = { bold: true, color: { argb: 'FFD97706' } };
+                        }
+                        cell.alignment = { horizontal: 'center', vertical: 'middle' };
+                    }
+
+                    // Deleted By column styling
+                    if (colNumber === 15) {
+                        cell.alignment = { horizontal: 'center', vertical: 'middle' };
+                        if (invoice.is_deleted) {
+                            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFECACA' } };
+                            cell.font = { bold: true, color: { argb: 'FF991B1B' } };
+                        }
+                    }
+
+                    // Add background color for invoice header columns
+                    if (colNumber <= 4) {
+                        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF3F4F6' } };
+                    }
+
+                    // Highlight entire row if invoice is deleted
+                    if (invoice.is_deleted && colNumber >= 5 && colNumber <= 13) {
+                        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEF2F2' } };
+                        cell.font = { color: { argb: 'FF7F1D1D' } };
+                    }
+                });
+
+                currentRow++;
+            });
+
+            // Merge cells for invoices with multiple items
+            if (itemCount > 1) {
+                const endRow = currentRow - 1;
+                
+                // Merge Date (Column A)
+                sheet.mergeCells(`A${startRow}:A${endRow}`);
+                sheet.getCell(`A${startRow}`).alignment = { horizontal: 'center', vertical: 'middle' };
+                
+                // Merge Invoice No (Column B)
+                sheet.mergeCells(`B${startRow}:B${endRow}`);
+                sheet.getCell(`B${startRow}`).alignment = { horizontal: 'center', vertical: 'middle' };
+                
+                // Merge Dealer Name (Column C)
+                sheet.mergeCells(`C${startRow}:C${endRow}`);
+                sheet.getCell(`C${startRow}`).alignment = { horizontal: 'left', vertical: 'middle' };
+                
+                // Merge Dispatch Ref (Column D)
+                sheet.mergeCells(`D${startRow}:D${endRow}`);
+                sheet.getCell(`D${startRow}`).alignment = { horizontal: 'center', vertical: 'middle' };
+                
+                // Merge Invoice Total (Column K)
+                sheet.mergeCells(`K${startRow}:K${endRow}`);
+                sheet.getCell(`K${startRow}`).alignment = { horizontal: 'right', vertical: 'middle' };
+                
+                // Merge Paid Amount (Column L)
+                sheet.mergeCells(`L${startRow}:L${endRow}`);
+                sheet.getCell(`L${startRow}`).alignment = { horizontal: 'right', vertical: 'middle' };
+                
+                // Merge Payment Method (Column M)
+                sheet.mergeCells(`M${startRow}:M${endRow}`);
+                sheet.getCell(`M${startRow}`).alignment = { horizontal: 'center', vertical: 'middle' };
+                
+                // Merge Status (Column N)
+                sheet.mergeCells(`N${startRow}:N${endRow}`);
+                sheet.getCell(`N${startRow}`).alignment = { horizontal: 'center', vertical: 'middle' };
+                
+                // Merge Deleted By (Column O)
+                sheet.mergeCells(`O${startRow}:O${endRow}`);
+                sheet.getCell(`O${startRow}`).alignment = { horizontal: 'center', vertical: 'middle' };
+            }
+        });
+
+        // Add summary totals at the bottom
+        if (invoices.length > 0) {
+            currentRow++; // Empty row
+            const summaryRow = sheet.getRow(currentRow);
+            
+            // Calculate unique invoice totals
+            const uniqueInvoices = {};
+            invoices.forEach(invoice => {
+                if (!uniqueInvoices[invoice.invoice_number]) {
+                    uniqueInvoices[invoice.invoice_number] = {
+                        total: parseFloat(invoice.total_amount),
+                        paid: parseFloat(invoice.paid_amount)
+                    };
+                }
+            });
+            
+            const grandTotal = Object.values(uniqueInvoices).reduce((sum, inv) => sum + inv.total, 0);
+            const totalPaid = Object.values(uniqueInvoices).reduce((sum, inv) => sum + inv.paid, 0);
+            const totalItems = invoices.reduce((sum, invoice) => sum + parseFloat(invoice.total_price), 0);
+
+            summaryRow.values = [
+                '', '', '', '', '', '', '', 'TOTALS:',
+                totalItems.toFixed(2),
+                grandTotal.toFixed(2),
+                totalPaid.toFixed(2),
+                '', '', ''
+            ];
+            
+            summaryRow.eachCell((cell, colNumber) => {
+                cell.font = { bold: true, size: 12 };
+                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE5E7EB' } };
+                cell.border = {
+                    top: { style: 'double' },
+                    bottom: { style: 'double' },
+                    left: { style: 'thin' },
+                    right: { style: 'thin' }
+                };
+                if (colNumber >= 10) {
+                    cell.alignment = { horizontal: 'right', vertical: 'middle' };
+                }
+            });
+        }
+
+        // Set column widths
+        sheet.columns = [
+            { width: 12 },  // Date
+            { width: 14 },  // Invoice No
+            { width: 20 },  // Dealer Name
+            { width: 14 },  // Dispatch Ref
+            { width: 14 },  // Product Code
+            { width: 12 },  // Sale Type
+            { width: 10 },  // Quantity
+            { width: 12 },  // Empty Returned
+            { width: 14 },  // Unit Price
+            { width: 14 },  // Item Total
+            { width: 14 },  // Invoice Total
+            { width: 14 },  // Paid Amount
+            { width: 14 },  // Payment Method
+            { width: 12 },  // Status
+            { width: 18 }   // Deleted By
+        ];
+
+        // Send file
+        const fileName = `invoices_${new Date().toISOString().split('T')[0]}.xlsx`;
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+
+        await workbook.xlsx.write(res);
+        res.end();
+    } catch (error) {
+        next(error);
+    }
+};
+
+module.exports = { exportInvoicesToExcel };
+
+module.exports = { exportInvoicesToExcel };
+
+module.exports = { exportInvoicesToExcel };
+
 module.exports = {
     createInvoice,
     reportDamage,
-    completeTrip,
-    acceptUnload,
-    cancelDispatch,
     getAllInvoices,
-    downloadInvoicePDF
-
+    downloadInvoicePDF,
+    softDeleteInvoice,
+    exportInvoicesToExcel
 };

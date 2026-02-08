@@ -13,6 +13,28 @@ const recordInventoryMovement = async (connection, data) => {
     );
 };
 
+const getNextDSPNumber = async (connection) => {
+    const [lastDSP] = await connection.execute(
+        `SELECT dispatch_number FROM dispatches 
+         ORDER BY created_at DESC, dispatch_number DESC LIMIT 1`
+    );
+    
+    let nextNumber = 1;
+    
+    if (lastDSP.length > 0) {
+        const lastDispatchNumber = lastDSP[0].dispatch_number;
+        const match = lastDispatchNumber.match(/DSP-(\d+)/);
+        if (match) {
+            nextNumber = parseInt(match[1], 10) + 1;
+        }
+    }
+    
+    // Format: DSP-01, DSP-02, ..., DSP-99, DSP-100, DSP-1000
+    const formattedNumber = nextNumber.toString().padStart(2, '0');
+    
+    return `DSP-${formattedNumber}`;
+};
+
 // Get all dispatches with filters
 const getAllDispatches = async (req, res, next) => {
     const { status, start_date, end_date, supervisor_id } = req.query;
@@ -259,7 +281,7 @@ const createDispatch = async (req, res, next) => {
             }
 
             const dispatch_id = generateId('DSP');
-            const dispatch_number = `DSP-${Date.now().toString().slice(-6)}`;
+            const dispatch_number = await getNextDSPNumber(connection);
 
             // 1. Insert Dispatch
             await connection.execute(

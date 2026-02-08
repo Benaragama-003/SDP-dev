@@ -16,9 +16,10 @@ const getDashboardStats = async (req, res, next) => {
                 SELECT COALESCE(SUM(i.total_amount), 0) as total
                 FROM invoices i
                 JOIN dispatches d ON i.dispatch_id = d.dispatch_id
-                WHERE d.supervisor_id = ? 
-                AND MONTH(i.invoice_date) = MONTH(CURDATE())
-                AND YEAR(i.invoice_date) = YEAR(CURDATE())
+                WHERE d.supervisor_id = ?
+                  AND i.is_deleted = FALSE
+                  AND MONTH(i.invoice_date) = MONTH(CURDATE())
+                  AND YEAR(i.invoice_date) = YEAR(CURDATE())
             `, [userId]);
 
             // 2. Total Credits to Be Collected (for this supervisor's invoices)
@@ -33,7 +34,7 @@ const getDashboardStats = async (req, res, next) => {
                 SELECT COUNT(*) as count
                 FROM invoices i
                 JOIN dispatches d ON i.dispatch_id = d.dispatch_id
-                WHERE d.supervisor_id = ?
+                WHERE d.supervisor_id = ? AND i.is_deleted = FALSE
             `, [userId]);
 
             // 4. Stock by Product (inventory - FILLED type)
@@ -102,10 +103,9 @@ const getDashboardStats = async (req, res, next) => {
 
             // 6. Monthly Total Revenue
             const [monthlyRevenue] = await pool.execute(`
-                SELECT COALESCE(SUM(total_amount), 0) as total
-                FROM invoices
-                WHERE MONTH(invoice_date) = MONTH(CURDATE())
-                AND YEAR(invoice_date) = YEAR(CURDATE())
+                SELECT COALESCE(SUM(i.total_amount), 0) as total
+                FROM invoices i
+                WHERE i.is_deleted = FALSE AND MONTH(i.invoice_date) = MONTH(CURDATE()) AND YEAR(i.invoice_date) = YEAR(CURDATE())
             `);
 
             return successResponse(res, 200, 'Dashboard stats retrieved', {

@@ -2,13 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import Sidebar from '../components/Sidebar';
 import AdminSidebar from '../components/AdminSidebar';
-import { Search, Eye, Download, Calendar, User, Loader2, AlertCircle } from 'lucide-react';
+import { Search, Eye, Download, Calendar, User, Loader2, AlertCircle, Trash2  } from 'lucide-react';
 import { formatDate } from '../utils/dateUtils';
 import { invoiceApi } from '../services/api';
 import '../styles/Invoice.css';
 
 const InvoiceView = () => {
-    const { isAdmin } = useAuth();
+    const { isAdmin, user } = useAuth();
     const [searchTerm, setSearchTerm] = useState('');
     const [filterStatus, setFilterStatus] = useState('all');
     const [selectedInvoice, setSelectedInvoice] = useState(null);
@@ -16,6 +16,17 @@ const InvoiceView = () => {
     const [invoices, setInvoices] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [showExportModal, setShowExportModal] = useState(false);
+    const [exportLoading, setExportLoading] = useState(false);
+    const [exportFilters, setExportFilters] = useState({
+        start_date: '',
+        end_date: '',
+        status: '',
+        dealer_name: ''
+    });
+    
+    // Check if user is supervisor
+    const isSupervisor = user?.role === 'SUPERVISOR';
 
     useEffect(() => {
         const fetchInvoices = async () => {
@@ -46,7 +57,8 @@ const InvoiceView = () => {
         const isPartial = totalPayments > 0 && totalPayments < totalAmount;
         const matchesStatus = filterStatus === 'all' || 
             (filterStatus === 'paid' && isPaid) ||
-            (filterStatus === 'pending' && !isPaid);
+            (filterStatus === 'pending' && !isPaid && !isPartial) ||
+            (filterStatus === 'partial' && isPartial);
         return matchesSearch && matchesStatus;
     });
 
@@ -65,6 +77,33 @@ const InvoiceView = () => {
             return { label: 'Pending', class: 'badge-warning' };
         } else {
             return { label: 'Pending', class: 'badge-danger' };
+        }
+    };
+
+    const handleExport = async () => {
+        try {
+            setExportLoading(true);
+            const response = await invoiceApi.exportToExcel(exportFilters);
+            
+            // Create blob and download
+            const blob = new Blob([response.data], { 
+                type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
+            });
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `invoices_${new Date().toISOString().split('T')[0]}.xlsx`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(url);
+            
+            setShowExportModal(false);
+        } catch (error) {
+            console.error('Error exporting invoices:', error);
+            alert(error.response?.data?.message || 'Failed to export invoices');
+        } finally {
+            setExportLoading(false);
         }
     };
 
@@ -95,6 +134,22 @@ const InvoiceView = () => {
                     alert('Failed to download invoice PDF');
                 }
             }
+        }
+    };
+
+    const handleDelete = async (invoiceId) => {
+        if (!window.confirm('Are you sure you want to delete this invoice? This action cannot be undone.')) {
+            return;
+        }
+
+        try {
+            await invoiceApi.softDelete(invoiceId);
+            // Remove the deleted invoice from local state immediately
+            setInvoices(prev => prev.filter(inv => inv.invoice_id !== invoiceId));
+            alert('Invoice deleted successfully');
+        } catch (err) {
+            console.error('Error deleting invoice:', err);
+            alert(err.response?.data?.message || 'Failed to delete invoice');
         }
     };
 
@@ -138,16 +193,21 @@ const InvoiceView = () => {
                             <h1 className="page-title">Invoice Archive</h1>
                             <p className="page-subtitle">Browse and manage all generated invoices</p>
                         </div>
-                        <button className="btn btn-primary">
-                            <Download size={20} />
-                            Export Excel
-                        </button>
+                        {isAdmin && (
+                            <button 
+                                className="btn btn-primary"
+                                onClick={() => setShowExportModal(true)}
+                            >
+                                <Download size={20} />
+                                Export Excel
+                            </button>
+                        )}
                     </div>
 
                     <div className="table-container">
                         <div className="table-header">
-                            <h3 className="table-title">All Records ({filteredInvoices.length})</h3>
-                            <div className="table-actions">
+                            <h3 className="table-title">All Record ({filteredInvoices.length})</h3>
+                            <div className="table-actions" >
                                 <select
                                     className="filter-select"
                                     value={filterStatus}
@@ -156,6 +216,7 @@ const InvoiceView = () => {
                                     <option value="all">All Status</option>
                                     <option value="paid">Paid</option>
                                     <option value="pending">Pending</option>
+                                    <option value="partial">Partial</option>
                                 </select>
                                 <div className="search-box">
                                     <Search className="search-icon" size={20} />
@@ -171,14 +232,14 @@ const InvoiceView = () => {
                         </div>
                         
                         {filteredInvoices.length === 0 ? (
-                            <div style={{ textAlign: 'center', padding: '40px', color: '#666' }}>
+                            <div style={{ textAlign: 'left', padding: '50px', color: '#666' }}>
                                 {searchTerm || filterStatus !== 'all' ? 'No invoices match your search criteria.' : 'No invoices found.'}
                             </div>
                         ) : (
                         <table className="data-table">
                             <thead>
                                 <tr>
-                                    <th>Invoice ID</th>
+                                    <th>Invoice No</th>
                                     <th>Date</th>
                                     <th>Dealer</th>
                                     <th>Amount</th>
@@ -203,13 +264,23 @@ const InvoiceView = () => {
                                             </span>
                                         </td>
                                         <td>
-                                            <div style={{ display: 'flex', justifyContent: 'center' }}>
+                                            <div style={{ display: 'flex', justifyContent: 'center' ,gap: '10px'}}>
                                                 <button
                                                     className="action-btn action-btn-view"
                                                     onClick={() => { setSelectedInvoice(invoice); setShowModal(true); }}
                                                 >
-                                                    <Eye size={16} /> View Details
+                                                    <Eye size={16} />
                                                 </button>
+                                                {isSupervisor && (
+                                                    <button
+                                                        className="action-btn"
+                                                        style={{ backgroundColor: '#fee2e2', color: '#dc2626' }}
+                                                        onClick={() => handleDelete(invoice.invoice_id)}
+                                                        title="Delete Invoice"
+                                                    >
+                                                        <Trash2 size={16} />
+                                                    </button>
+                                                )}
                                             </div>
                                         </td>
                                     </tr>
@@ -220,6 +291,142 @@ const InvoiceView = () => {
                         )}
                     </div>
                 </main>
+
+                {/* Export Modal */}
+                {showExportModal && (
+                    <div className="modal-overlay" onClick={() => !exportLoading && setShowExportModal(false)}>
+                        <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '500px' }}>
+                            <div className="modal-header">
+                                <h2 className="modal-title">
+                                    <Download size={24} style={{ marginRight: '10px' }} />
+                                    Export Invoices
+                                </h2>
+                                <button 
+                                    className="modal-close" 
+                                    onClick={() => !exportLoading && setShowExportModal(false)}
+                                    disabled={exportLoading}
+                                >×</button>
+                            </div>
+
+                            <div className="modal-body" style={{ padding: '20px' }}>
+                                <div style={{ marginBottom: '15px' }}>
+                                    <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500' }}>
+                                        From Date
+                                    </label>
+                                    <input
+                                        type="date"
+                                        value={exportFilters.start_date}
+                                        onChange={e => setExportFilters(f => ({ ...f, start_date: e.target.value }))}
+                                        style={{
+                                            width: '100%',
+                                            padding: '10px',
+                                            borderRadius: '6px',
+                                            border: '1px solid #ddd',
+                                            fontSize: '14px'
+                                        }}
+                                        disabled={exportLoading}
+                                    />
+                                </div>
+
+                                <div style={{ marginBottom: '15px' }}>
+                                    <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500' }}>
+                                        To Date
+                                    </label>
+                                    <input
+                                        type="date"
+                                        value={exportFilters.end_date}
+                                        onChange={e => setExportFilters(f => ({ ...f, end_date: e.target.value }))}
+                                        style={{
+                                            width: '100%',
+                                            padding: '10px',
+                                            borderRadius: '6px',
+                                            border: '1px solid #ddd',
+                                            fontSize: '14px'
+                                        }}
+                                        disabled={exportLoading}
+                                    />
+                                </div>
+
+                                <div style={{ marginBottom: '15px' }}>
+                                    <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500' }}>
+                                        Status
+                                    </label>
+                                    <select
+                                        value={exportFilters.status}
+                                        onChange={e => setExportFilters(f => ({ ...f, status: e.target.value }))}
+                                        style={{
+                                            width: '100%',
+                                            padding: '10px',
+                                            borderRadius: '6px',
+                                            border: '1px solid #ddd',
+                                            fontSize: '14px'
+                                        }}
+                                        disabled={exportLoading}
+                                    >
+                                        <option value="">All Status</option>
+                                        <option value="Paid">Paid</option>
+                                        <option value="Pending">Pending</option>
+                                        <option value="Partial">Partial</option>
+                                    </select>
+                                </div>
+
+                                <div style={{ marginBottom: '15px' }}>
+                                    <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500' }}>
+                                        Dealer Name (Optional)
+                                    </label>
+                                    <input
+                                        type="text"
+                                        placeholder="Filter by dealer name..."
+                                        value={exportFilters.dealer_name}
+                                        onChange={e => setExportFilters(f => ({ ...f, dealer_name: e.target.value }))}
+                                        style={{
+                                            width: '100%',
+                                            padding: '10px',
+                                            borderRadius: '6px',
+                                            border: '1px solid #ddd',
+                                            fontSize: '14px'
+                                        }}
+                                        disabled={exportLoading}
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="modal-footer" style={{ 
+                                padding: '15px 20px', 
+                                display: 'flex', 
+                                justifyContent: 'flex-end', 
+                                gap: '10px',
+                                borderTop: '1px solid #eee' 
+                            }}>
+                                <button 
+                                    className="btn btn-secondary" 
+                                    onClick={() => setShowExportModal(false)}
+                                    disabled={exportLoading}
+                                >
+                                    Cancel
+                                </button>
+                                <button 
+                                    className="btn btn-primary" 
+                                    onClick={handleExport}
+                                    disabled={exportLoading}
+                                    style={{ minWidth: '120px' }}
+                                >
+                                    {exportLoading ? (
+                                        <>
+                                            <Loader2 className="spinner" size={18} />
+                                            Exporting...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Download size={18} />
+                                            Export
+                                        </>
+                                    )}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
 
                 {/* Invoice View Modal */}
                 {showModal && selectedInvoice && (
@@ -254,7 +461,7 @@ const InvoiceView = () => {
                                 {/* Dispatch Info */}
                                 <div style={{ marginBottom: '25px', padding: '15px', backgroundColor: '#f0f4ff', borderRadius: '12px' }}>
                                     <div style={{ fontSize: '12px', color: '#666', marginBottom: '5px' }}>Dispatch Reference</div>
-                                    <div style={{ fontWeight: '600', color: '#101540' }}>{selectedInvoice.dispatch_id}</div>
+                                    <div style={{ fontWeight: '600', color: '#101540' }}>{selectedInvoice.dispatch_number}</div>
                                 </div>
 
                                 {/* Purchased Items Section */}

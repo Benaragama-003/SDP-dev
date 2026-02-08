@@ -155,7 +155,7 @@ const SupervisorDispatchView = () => {
                                     <h3 style={{ margin: 0, color: '#1976d2', display: 'flex', alignItems: 'center', gap: '10px' }}>
                                         <Truck size={24} /> Active Dispatch
                                     </h3>
-                                    <p style={{ margin: '5px 0 0', color: '#666' }}>{activeDispatch.dispatch_id}</p>
+                                    <p style={{ margin: '5px 0 0', color: '#666' }}>{activeDispatch.dispatch_number}</p>
                                 </div>
                                 <span className={`badge ${getStatusBadgeClass(activeDispatch.status)}`} style={{ fontSize: '14px', padding: '8px 15px' }}>
                                     {activeDispatch.status.replace('_', ' ')}
@@ -220,7 +220,7 @@ const SupervisorDispatchView = () => {
                             <table className="data-table">
                                 <thead>
                                     <tr>
-                                        <th>Dispatch ID</th>
+                                        <th>Dispatch No</th>
                                         <th>Date</th>
                                         <th>Lorry</th>
                                         <th>Route</th>
@@ -238,7 +238,7 @@ const SupervisorDispatchView = () => {
                                     ) : (
                                     filtered.map((dispatch) => (
                                         <tr key={dispatch.dispatch_id}>
-                                            <td style={{ fontWeight: '600' }}>{dispatch.dispatch_id}</td>
+                                            <td style={{ fontWeight: '600' }}>{dispatch.dispatch_number}</td>
                                             <td>{formatDate(dispatch.dispatch_date)}</td>
                                             <td>{dispatch.plate_number}</td>
                                             <td>{dispatch.route}</td>

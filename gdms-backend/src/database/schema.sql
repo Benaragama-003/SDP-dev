@@ -285,6 +285,9 @@ CREATE TABLE invoices (
     due_date DATE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+	is_deleted BOOLEAN DEFAULT FALSE,
+	deleted_at TIMESTAMP NULL,
+	deleted_by VARCHAR(20) NULL,
     FOREIGN KEY (dealer_id) REFERENCES dealers(dealer_id),
     FOREIGN KEY (dispatch_id) REFERENCES dispatches(dispatch_id),
     INDEX idx_invoice_number (invoice_number),
@@ -383,4 +386,9 @@ CREATE TABLE credit_settlements (
     INDEX idx_payment (payment_id),
     INDEX idx_date (settlement_date)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
+
+
+
 

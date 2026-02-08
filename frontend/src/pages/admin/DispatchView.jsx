@@ -146,7 +146,7 @@ const DispatchView = () => {
                         <table className="data-table">
                             <thead>
                                 <tr>
-                                    <th>Dispatch ID</th>
+                                    <th>Dispatch No</th>
                                     <th>Date</th>
                                     <th>Lorry</th>
                                     <th>Supervisor</th>
@@ -165,7 +165,7 @@ const DispatchView = () => {
                                 ) : (
                                 filtered.map((dispatch) => (
                                     <tr key={dispatch.dispatch_id}>
-                                        <td style={{ fontWeight: '600' }}>{dispatch.dispatch_id}</td>
+                                        <td style={{ fontWeight: '600' }}>{dispatch.dispatch_number}</td>
                                         <td>{formatDate(dispatch.dispatch_date)}</td>
                                         <td>{dispatch.plate_number}</td>
                                         <td>{dispatch.supervisor_name}</td>

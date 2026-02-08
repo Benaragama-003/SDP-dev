@@ -20,19 +20,18 @@ const Inventory = () => {
         reason: ''
     });
 
-    const fetchInventory = async () => {
-        try {
-            setLoading(true);
-            const response = await api.get('/products/inventory');
-            setInventoryData(response.data.data);
-        } catch (err) {
-            console.error("Failed to fetch inventory", err);
-            setInventoryData([]);
-        } finally {
-            setLoading(false);
-        }
-    };
-
+        const fetchInventory = async () => {
+            try {
+                setLoading(true);
+                const response = await api.get('/products/inventory/summary'); 
+                setInventoryData(response.data.data);
+            } catch (err) {
+                console.error("Failed to fetch inventory", err);
+                setInventoryData([]);
+            } finally {
+                setLoading(false);
+            }
+        };
     useEffect(() => {
         fetchInventory();
         fetchActiveDispatch();

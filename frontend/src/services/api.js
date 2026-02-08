@@ -88,8 +88,8 @@ export const productApi = {
     // Get all products
     getAllProducts: () => api.get('/products'),
 
-    // Get inventory summary (grouped by size)
-    getInventorySummary: () => api.get('/products/inventory'),
+    // Get inventory summary (role-based: ADMIN sees all, SUPERVISOR sees ACTIVE only)
+    getInventorySummary: () => api.get('/products/inventory/summary'),  // ✅ UPDATED
 
     // Create new product (admin only)
     createProduct: (productData) => api.post('/products', productData),
@@ -202,6 +202,13 @@ export const invoiceApi = {
     
     // Download invoice as PDF
     downloadPDF: (id) => api.get(`/invoices/${id}/pdf`, { responseType: 'blob' }),
+    softDelete: (id) => api.put(`/invoices/${id}/delete`),
+    exportToExcel: (params = {}) => {
+        const queryString = new URLSearchParams(params).toString();
+        return api.get(`/invoices/export${queryString ? `?${queryString}` : ''}`, {
+            responseType: 'blob'
+        });
+    }
 };
 
 // Credit API
