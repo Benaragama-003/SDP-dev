@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import AdminSidebar from '../../components/AdminSidebar';
+import NotificationBell from '../../components/NotificationBell';
 import '../../styles/Dashboard.css';
 import { Package, Users, Truck, DollarSign, FileText, TrendingUp } from 'lucide-react';
 import { dashboardApi } from '../../services/api';
@@ -46,8 +47,11 @@ const AdminDashboard = () => {
             <div className="dashboard-container">
                 <main className="dashboard-main">
                     <div className="dashboard-header">
-                        <h1 className="header-title">Admin Dashboard</h1>
-                        <p className="header-subtitle">Overview of your distribution management system</p>
+                        <div>
+                            <h1 className="header-title">Admin Dashboard</h1>
+                            <p className="header-subtitle">Overview of your distribution management system</p>
+                        </div>
+                        <NotificationBell />
                     </div>
 
                     <div className="dashboard-banner">

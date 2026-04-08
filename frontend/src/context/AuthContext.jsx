@@ -31,8 +31,8 @@ export const AuthProvider = ({ children }) => {
                     const userData = response.data.data;
                     const userSession = {
                         ...userData,
-                        name: userData.first_name && userData.last_name 
-                            ? `${userData.first_name} ${userData.last_name}` 
+                        name: userData.first_name && userData.last_name
+                            ? `${userData.first_name} ${userData.last_name}`
                             : userData.username
                     };
                     setUser(userSession);
@@ -54,6 +54,33 @@ export const AuthProvider = ({ children }) => {
         verifySession();
     }, []);
 
+    // Location tracking for supervisors
+    useEffect(() => {
+        if (!user || user.role?.toUpperCase() !== 'SUPERVISOR') return;
+
+        const sendLocation = () => {
+            navigator.geolocation.getCurrentPosition(
+                async (position) => {
+                    try {
+                        await api.put('/location/update', {
+                            latitude: position.coords.latitude,
+                            longitude: position.coords.longitude
+                        });
+                    } catch (err) {
+                        console.error('Failed to send location:', err);
+                    }
+                },
+                (error) => console.error('Geolocation error:', error),
+                { enableHighAccuracy: true, timeout: 10000 }
+            );
+        };
+
+        sendLocation(); // Send immediately on login
+        const interval = setInterval(sendLocation, 30000); // Then every 30 seconds
+
+        return () => clearInterval(interval); // Cleanup on logout
+    }, [user]);
+
     // Unified login function
     const login = async (username, password) => {
         try {
@@ -62,8 +89,8 @@ export const AuthProvider = ({ children }) => {
 
             const userSession = {
                 ...userData,
-                name: userData.first_name && userData.last_name 
-                    ? `${userData.first_name} ${userData.last_name}` 
+                name: userData.first_name && userData.last_name
+                    ? `${userData.first_name} ${userData.last_name}`
                     : userData.username
             };
 

@@ -3,6 +3,7 @@ import Sidebar from '../components/Sidebar';
 import { Save, Plus, Loader2, AlertCircle, Truck } from 'lucide-react';
 import DateInput from '../components/DateInput';
 import { dealerApi, dispatchApi, invoiceApi } from '../services/api';
+import { formatDate } from '../utils/dateUtils';
 import '../styles/Invoice.css';
 
 const InvoiceCreate = () => {
@@ -25,6 +26,13 @@ const InvoiceCreate = () => {
                 const dispatchRes = await dispatchApi.getMyDispatch();
                 const dispatch = dispatchRes.data.data;
                 setActiveDispatch(dispatch);
+                
+                if (dispatch && dispatch.dispatch_date) {
+                    setInvoiceData(prev => ({
+                        ...prev,
+                        date: dispatch.dispatch_date
+                    }));
+                }
                 
                 if (dispatch && dispatch.items) {
                     // Set lorry stock from dispatch items (only items with available balance)
@@ -270,6 +278,12 @@ const InvoiceCreate = () => {
             const dispatchRes = await dispatchApi.getMyDispatch();
             const dispatch = dispatchRes.data.data;
             setActiveDispatch(dispatch);
+            if (dispatch && dispatch.dispatch_date) {
+                setInvoiceData(prev => ({
+                    ...prev,
+                    date: dispatch.dispatch_date
+                }));
+            }
             if (dispatch && dispatch.items) {
                 setLorryStock(dispatch.items.filter(item => {
                     const balance = item.balance_quantity ?? (item.loaded_quantity - (item.sold_filled || 0) - (item.sold_new || 0) - (item.damaged_quantity || 0));
@@ -424,10 +438,11 @@ const InvoiceCreate = () => {
                                 </div>
                                 <div className="form-field">
                                     <label>Date*</label>
-                                    <DateInput
-                                        value={invoiceData.date}
-                                        onChange={(value) => setInvoiceData({ ...invoiceData, date: value })}
-                                        required
+                                    <input
+                                        type="text"
+                                        value={formatDate(invoiceData.date)}
+                                        readOnly
+                                        style={{ backgroundColor: '#f9f9f9', padding: '10px', borderRadius: '8px', border: '1px solid #ddd', width: '100%' }}
                                     />
                                 </div>
                             </div>

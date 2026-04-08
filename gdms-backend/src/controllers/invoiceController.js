@@ -3,6 +3,7 @@ const { generateId } = require('../utils/generateId');
 const { successResponse, errorResponse } = require('../utils/responseHelper');
 const PDFDocument = require('pdfkit');
 const ExcelJS = require('exceljs');
+const { createNotification, notifyAllAdmins } = require('../utils/notificationHelper');
 
 // Helper function to generate next sequential INV number
 const getNextINVNumber = async (connection) => {
@@ -177,6 +178,28 @@ const createInvoice = async (req, res, next) => {
                 );
                 await connection.execute('UPDATE dealers SET current_credit = current_credit + ? WHERE dealer_id = ?', [total_amount, dealer_id]);
             } else if (payment_method === 'CHEQUE') {
+                if (!cheque_details || !cheque_details.number || !cheque_details.date || !cheque_details.bank || !cheque_details.branch) {
+                    await connection.rollback();
+                    return errorResponse(res, 400, 'All cheque details are required');
+                }
+                
+                if (!/^\d{6}$/.test(cheque_details.number)) {
+                    await connection.rollback();
+                    return errorResponse(res, 400, 'Cheque number must be exactly 6 digits');
+                }
+
+                const [existingCheque] = await connection.execute(
+                    `SELECT cheque_number FROM cheque_payments 
+                     WHERE bank_name = ? AND cheque_number = ? 
+                     AND clearance_status NOT IN ('RETURNED', 'CANCELLED')`,
+                    [cheque_details.bank, cheque_details.number]
+                );
+                
+                if (existingCheque.length > 0) {
+                    await connection.rollback();
+                    return errorResponse(res, 400, `Cheque number ${cheque_details.number} already exists for ${cheque_details.bank} and has not been returned or cancelled.`);
+                }
+
                 const chequeAmount = Math.min(actualPaidAmount || total_amount, total_amount);
                 const remainingCredit = total_amount - chequeAmount;
                 const payment_id = generateId('PAY');
@@ -214,6 +237,22 @@ const createInvoice = async (req, res, next) => {
 
             // Step D: Update Supervisor Performance
             await connection.execute('UPDATE supervisors SET achieved_sales = achieved_sales + ? WHERE supervisor_id = ?', [total_amount, supervisor_id]);
+
+            // Notify admins about new invoice
+            await notifyAllAdmins(connection, {
+                title: 'Invoice Created',
+                message: `Invoice ${invoice_number} created for dispatch ${dispatch_id} (Rs. ${total_amount.toLocaleString()}).`,
+                type: 'INVOICE_CREATED',
+                reference_id: invoice_id
+            });
+            // Notify the supervisor who created it
+            await createNotification(connection, {
+                user_id: collected_by,
+                title: 'Invoice Created',
+                message: `Your invoice ${invoice_number} has been created successfully (Rs. ${total_amount.toLocaleString()}).`,
+                type: 'INVOICE_CREATED',
+                reference_id: invoice_id
+            });
 
             await connection.commit();
             return successResponse(res, 201, 'Invoice created successfully', { invoice_number });
@@ -266,6 +305,16 @@ const reportDamage = async (req, res, next) => {
             );
 
             await connection.commit();
+
+            // Notify admins about damage reported by supervisor
+            const [prodInfo] = await pool.execute('SELECT cylinder_size FROM products WHERE product_id = ?', [product_id]);
+            await notifyAllAdmins(pool, {
+                title: 'Damage Reported (Dispatch)',
+                message: `${quantity} x ${prodInfo[0]?.cylinder_size || product_id} damaged during dispatch ${dispatch_id}.`,
+                type: 'DAMAGE_REPORTED',
+                reference_id: dispatch_id
+            });
+
             return successResponse(res, 200, 'Damage reported and stock adjusted');
         } catch (error) {
             await connection.rollback();
@@ -295,6 +344,18 @@ const softDeleteInvoice = async (req, res, next) => {
             if (!invoiceRows.length) throw new Error('Invoice not found or already deleted');
 
             const invoice = invoiceRows[0];
+
+            // 1.5 Verify the dispatch is still active
+            const [dispatchRows] = await connection.execute(
+                'SELECT status FROM dispatches WHERE dispatch_id = ?', [invoice.dispatch_id]
+            );
+            if (dispatchRows.length === 0 || dispatchRows[0].status !== 'IN PROGRESS') {
+                await connection.rollback();
+                return res.status(400).json({ 
+                    success: false, 
+                    message: `Cannot delete invoice: The associated dispatch is ${dispatchRows.length ? dispatchRows[0].status.toLowerCase() : 'deleted'} and no longer active.` 
+                });
+            }
 
             // 2. Get invoice items to reverse stock changes
             const [items] = await connection.execute(
@@ -372,6 +433,14 @@ const softDeleteInvoice = async (req, res, next) => {
                  WHERE invoice_id = ?`, 
                 [deletedBy, id]
             );
+
+            // Notify admins about invoice cancellation
+            await notifyAllAdmins(connection, {
+                title: 'Invoice Cancelled',
+                message: `Invoice ${invoice.invoice_number || id} has been cancelled and all references reversed.`,
+                type: 'INVOICE_CANCELLED',
+                reference_id: id
+            });
 
             await connection.commit();
             return successResponse(res, 200, 'Invoice soft deleted and references reversed');
@@ -601,32 +670,10 @@ const exportInvoicesToExcel = async (req, res, next) => {
                 i.is_deleted,
                 CONCAT(del_user.first_name, ' ', del_user.last_name) as deleted_by_name,
                 i.deleted_at,
-                CASE 
-                    WHEN i.payment_type = 'CREDIT' THEN 
-                        COALESCE((SELECT SUM(amount) 
-                                  FROM payments 
-                                  WHERE invoice_id = i.invoice_id 
-                                  AND status = 'CLEARED'), 0)
-                    ELSE i.total_amount
-                END as paid_amount,
                 i.payment_type as payment_method,
-                CASE 
-                    WHEN i.payment_type = 'CREDIT' THEN
-                        CASE 
-                            WHEN COALESCE((SELECT SUM(amount) 
-                                          FROM payments 
-                                          WHERE invoice_id = i.invoice_id 
-                                          AND status = 'CLEARED'), 0) >= i.total_amount 
-                            THEN 'Paid'
-                            WHEN COALESCE((SELECT SUM(amount) 
-                                          FROM payments 
-                                          WHERE invoice_id = i.invoice_id 
-                                          AND status = 'CLEARED'), 0) > 0 
-                            THEN 'Partial'
-                            ELSE 'Pending'
-                        END
-                    ELSE 'Paid'
-                END as payment_status
+                COALESCE((SELECT SUM(amount) FROM payments WHERE invoice_id = i.invoice_id AND status = 'COMPLETED'), 0) as total_paid,
+                COALESCE((SELECT SUM(amount) FROM payments WHERE invoice_id = i.invoice_id AND status = 'PENDING'), 0) as pending_paid,
+                COALESCE((SELECT SUM(remaining_balance) FROM credit_transactions WHERE invoice_id = i.invoice_id), 0) as credit_balance
             FROM invoices i
             JOIN dealers d ON i.dealer_id = d.dealer_id
             JOIN dispatches disp ON i.dispatch_id = disp.dispatch_id
@@ -646,20 +693,16 @@ const exportInvoicesToExcel = async (req, res, next) => {
             params.push(end_date);
         }
         if (status && status !== 'All Status' && status !== '') {
-            // Map frontend status to payment status logic
+            // Updated filtering logic using exact math like frontend
             if (status === 'Paid') {
-                query += ` AND (
-                    (i.payment_type != 'CREDIT') OR 
-                    (i.payment_type = 'CREDIT' AND 
-                     COALESCE((SELECT SUM(amount) FROM payments WHERE invoice_id = i.invoice_id AND status = 'CLEARED'), 0) >= i.total_amount)
-                )`;
+                query += ` AND COALESCE((SELECT SUM(amount) FROM payments WHERE invoice_id = i.invoice_id AND status = 'COMPLETED'), 0) >= i.total_amount`;
             } else if (status === 'Pending') {
-                query += ` AND i.payment_type = 'CREDIT' 
-                          AND COALESCE((SELECT SUM(amount) FROM payments WHERE invoice_id = i.invoice_id AND status = 'CLEARED'), 0) = 0`;
+                query += ` AND COALESCE((SELECT SUM(amount) FROM payments WHERE invoice_id = i.invoice_id AND status = 'COMPLETED'), 0) < i.total_amount
+                           AND COALESCE((SELECT SUM(amount) FROM payments WHERE invoice_id = i.invoice_id AND status IN ('COMPLETED', 'PENDING')), 0) = 0`;
             } else if (status === 'Partial') {
-                query += ` AND i.payment_type = 'CREDIT' 
-                          AND COALESCE((SELECT SUM(amount) FROM payments WHERE invoice_id = i.invoice_id AND status = 'CLEARED'), 0) > 0 
-                          AND COALESCE((SELECT SUM(amount) FROM payments WHERE invoice_id = i.invoice_id AND status = 'CLEARED'), 0) < i.total_amount`;
+                query += ` AND COALESCE((SELECT SUM(amount) FROM payments WHERE invoice_id = i.invoice_id AND status IN ('COMPLETED', 'PENDING')), 0) > 0 
+                           AND COALESCE((SELECT SUM(amount) FROM payments WHERE invoice_id = i.invoice_id AND status = 'COMPLETED'), 0) < i.total_amount
+                           AND COALESCE((SELECT SUM(remaining_balance) FROM credit_transactions WHERE invoice_id = i.invoice_id), 0) > 0`;
             }
         }
         if (dealer_name) {
@@ -742,6 +785,26 @@ const exportInvoicesToExcel = async (req, res, next) => {
             invoiceItems.forEach((invoice, index) => {
                 const row = sheet.getRow(currentRow);
                 
+                // Calculate correct status and paid amount mirroring frontend
+                const totalPaid = parseFloat(invoice.total_paid) || 0;
+                const pendingPaid = parseFloat(invoice.pending_paid) || 0;
+                const totalPayments = totalPaid + pendingPaid;
+                const totalAmount = parseFloat(invoice.total_amount) || 0;
+                const creditBalance = parseFloat(invoice.credit_balance) || 0;
+                
+                const paidAmount = totalPayments; // Or totalPaid, depending on if you want to include pending cheques in "Paid Amount". Usually frontend shows totalPayments in badge
+                
+                let paymentStatus = 'Pending';
+                if (totalPaid >= totalAmount) {
+                    paymentStatus = 'Paid';
+                } else if (totalPayments > 0 && creditBalance > 0) {
+                    paymentStatus = 'Partial';
+                } else if (pendingPaid > 0) {
+                    paymentStatus = 'Pending';
+                }
+                
+                // Add actual payment method by checking payments (optional enhancement)
+                
                 row.values = [
                     new Date(invoice.invoice_date).toLocaleDateString(),
                     invoice.invoice_number,
@@ -753,10 +816,10 @@ const exportInvoicesToExcel = async (req, res, next) => {
                     invoice.empty_returned || 0,
                     parseFloat(invoice.unit_price).toFixed(2),
                     parseFloat(invoice.total_price).toFixed(2),
-                    parseFloat(invoice.total_amount).toFixed(2),
-                    parseFloat(invoice.paid_amount).toFixed(2),
+                    totalAmount.toFixed(2),
+                    paidAmount.toFixed(2),
                     invoice.payment_method,
-                    invoice.payment_status,
+                    paymentStatus,
                     invoice.is_deleted ? (invoice.deleted_by_name || 'N/A') : '-'
                 ];
 
@@ -782,13 +845,14 @@ const exportInvoicesToExcel = async (req, res, next) => {
 
                     // Status color coding
                     if (colNumber === 14) {
-                        if (invoice.payment_status === 'Paid') {
+                        const statusVal = cell.value;
+                        if (statusVal === 'Paid') {
                             cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD1FAE5' } };
                             cell.font = { bold: true, color: { argb: 'FF059669' } };
-                        } else if (invoice.payment_status === 'Pending') {
+                        } else if (statusVal === 'Pending') {
                             cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEE2E2' } };
                             cell.font = { bold: true, color: { argb: 'FFDC2626' } };
-                        } else if (invoice.payment_status === 'Partial') {
+                        } else if (statusVal === 'Partial') {
                             cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEF3C7' } };
                             cell.font = { bold: true, color: { argb: 'FFD97706' } };
                         }
@@ -870,9 +934,11 @@ const exportInvoicesToExcel = async (req, res, next) => {
             const uniqueInvoices = {};
             invoices.forEach(invoice => {
                 if (!uniqueInvoices[invoice.invoice_number]) {
+                    const totalPaid = parseFloat(invoice.total_paid) || 0;
+                    const pendingPaid = parseFloat(invoice.pending_paid) || 0;
                     uniqueInvoices[invoice.invoice_number] = {
                         total: parseFloat(invoice.total_amount),
-                        paid: parseFloat(invoice.paid_amount)
+                        paid: totalPaid + pendingPaid
                     };
                 }
             });
@@ -882,8 +948,7 @@ const exportInvoicesToExcel = async (req, res, next) => {
             const totalItems = invoices.reduce((sum, invoice) => sum + parseFloat(invoice.total_price), 0);
 
             summaryRow.values = [
-                '', '', '', '', '', '', '', 'TOTALS:',
-                totalItems.toFixed(2),
+                '', '', '', '', '', '', '', '', '', 'TOTALS:',
                 grandTotal.toFixed(2),
                 totalPaid.toFixed(2),
                 '', '', ''

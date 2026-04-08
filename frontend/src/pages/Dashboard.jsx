@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import AdminDashboard from './admin/AdminDashboard';
 import Sidebar from '../components/Sidebar';
+import NotificationBell from '../components/NotificationBell';
 import '../styles/Dashboard.css';
 import { CreditCard, Truck, Package, DollarSign, Store } from 'lucide-react';
 import { dashboardApi } from '../services/api';
@@ -39,8 +40,11 @@ const Dashboard = () => {
             <div className="dashboard-container">
                 <main className="dashboard-main">
                     <div className="dashboard-header">
-                        <h1 className="header-title">Dashboard</h1>
-                        <p className="header-subtitle">Welcome back! Here's your performance overview.</p>
+                        <div>
+                            <h1 className="header-title">Dashboard</h1>
+                            <p className="header-subtitle">Welcome back! Here's your performance overview.</p>
+                        </div>
+                        <NotificationBell />
                     </div>
 
                     <div className="dashboard-banner">

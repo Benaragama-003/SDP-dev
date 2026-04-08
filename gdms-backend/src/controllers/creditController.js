@@ -1,4 +1,5 @@
 const { getConnection } = require('../config/database');
+const ExcelJS = require('exceljs');
 const { generateId } = require('../utils/generateId');
 const { successResponse, errorResponse } = require('../utils/responseHelper');
 
@@ -151,7 +152,29 @@ const settleCredit = async (req, res, next) => {
 
             // If cheque payment, record cheque details
             // cheque_payment_id IS the payment_id (FK relationship)
-            if (payment_method === 'CHEQUE' && cheque_details) {
+            if (payment_method === 'CHEQUE') {
+                if (!cheque_details || !cheque_details.number || !cheque_details.date || !cheque_details.bank || !cheque_details.branch) {
+                    await connection.rollback();
+                    return errorResponse(res, 400, 'All cheque details are required for cheque payments');
+                }
+
+                if (!/^\d{6}$/.test(cheque_details.number)) {
+                    await connection.rollback();
+                    return errorResponse(res, 400, 'Cheque number must be exactly 6 digits');
+                }
+
+                const [existingCheque] = await connection.execute(
+                    `SELECT cheque_number FROM cheque_payments 
+                     WHERE bank_name = ? AND cheque_number = ? 
+                     AND clearance_status NOT IN ('RETURNED', 'CANCELLED')`,
+                    [cheque_details.bank, cheque_details.number]
+                );
+
+                if (existingCheque.length > 0) {
+                    await connection.rollback();
+                    return errorResponse(res, 400, `Cheque number ${cheque_details.number} already exists for ${cheque_details.bank} and has not been returned or cancelled.`);
+                }
+
                 await connection.execute(
                     `INSERT INTO cheque_payments (cheque_payment_id, cheque_number, cheque_date, bank_name, branch_name, clearance_status)
                      VALUES (?, ?, ?, ?, ?, 'PENDING')`,
@@ -176,6 +199,12 @@ const settleCredit = async (req, res, next) => {
                  SET settled_amount = ?, remaining_balance = ?, updated_at = NOW()
                  WHERE credit_id = ?`,
                 [newSettled, newRemaining, credit_id]
+            );
+
+            // Deduct from dealer's total current_credit
+            await connection.execute(
+                `UPDATE dealers SET current_credit = GREATEST(0, current_credit - ?) WHERE dealer_id = ?`,
+                [amount, credit.dealer_id]
             );
 
             await connection.commit();
@@ -297,11 +326,88 @@ const getCreditSummary = async (req, res, next) => {
     }
 };
 
+const exportCredits = async (req, res, next) => {
+    try {
+        const pool = await getConnection();
+        const [credits] = await pool.execute(`
+            SELECT 
+                d.dealer_name,
+                d.contact_number,
+                d.route,
+                d.credit_limit,
+                COALESCE(SUM(ct.credit_amount), 0) as total_credit,
+                COALESCE(SUM(ct.settled_amount), 0) as total_settled,
+                COALESCE(SUM(CASE WHEN ct.remaining_balance > 0 THEN ct.remaining_balance ELSE 0 END), 0) as total_remaining,
+                COALESCE(SUM(CASE WHEN ct.status = 'OVERDUE' THEN ct.remaining_balance ELSE 0 END), 0) as total_overdue
+            FROM dealers d
+            LEFT JOIN credit_transactions ct ON d.dealer_id = ct.dealer_id
+            WHERE d.status = 'ACTIVE'
+            GROUP BY d.dealer_id, d.dealer_name, d.contact_number, d.route, d.credit_limit
+            HAVING total_credit > 0 OR total_remaining > 0
+            ORDER BY total_overdue DESC, total_remaining DESC
+        `);
+
+        if (credits.length === 0) {
+            return errorResponse(res, 404, 'No credit accounts found to export');
+        }
+
+        const workbook = new ExcelJS.Workbook();
+        const sheet = workbook.addWorksheet('Credit Report');
+
+        sheet.mergeCells('A1:H1');
+        sheet.getCell('A1').value = 'HIDELLANA DISTRIBUTORS - CREDIT ACCOUNTS REPORT';
+        sheet.getCell('A1').font = { bold: true, size: 14 };
+        sheet.getCell('A1').alignment = { horizontal: 'center' };
+
+        sheet.getRow(3).values = [
+            'Dealer Name', 'Contact', 'Route', 'Limit (Rs)', 'Total Issued (Rs)', 'Settled (Rs)', 'Outstanding (Rs)', 'Overdue (Rs)'
+        ];
+
+        sheet.getRow(3).eachCell(cell => {
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF101540' } };
+            cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+        });
+
+        credits.forEach(c => {
+            sheet.addRow([
+                c.dealer_name,
+                c.contact_number,
+                c.route,
+                parseFloat(c.credit_limit || 0).toFixed(2),
+                parseFloat(c.total_credit).toFixed(2),
+                parseFloat(c.total_settled).toFixed(2),
+                parseFloat(c.total_remaining).toFixed(2),
+                parseFloat(c.total_overdue).toFixed(2)
+            ]);
+        });
+
+        // Totals
+        const totalIssued = credits.reduce((sum, c) => sum + parseFloat(c.total_credit), 0);
+        const totalOutstanding = credits.reduce((sum, c) => sum + parseFloat(c.total_remaining), 0);
+        const totalOverdue = credits.reduce((sum, c) => sum + parseFloat(c.total_overdue), 0);
+
+        const summaryRow = sheet.addRow([]);
+        const totalRow = sheet.addRow(['', '', '', 'TOTALS:', totalIssued.toFixed(2), '', totalOutstanding.toFixed(2), totalOverdue.toFixed(2)]);
+        totalRow.font = { bold: true };
+
+        sheet.columns.forEach(col => { col.width = 15; });
+        sheet.getColumn(1).width = 25; // Dealer name
+
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', 'attachment; filename="credit_report.xlsx"');
+        await workbook.xlsx.write(res);
+        res.end();
+    } catch (error) {
+        next(error);
+    }
+};
+
 module.exports = {
     getAllCredits,
     getDealerCredits,
     settleCredit,
     getSettlementHistory,
     updateOverdueStatus,
-    getCreditSummary
+    getCreditSummary,
+    exportCredits
 };

@@ -8,7 +8,8 @@ const {
     settleCredit,
     getSettlementHistory,
     updateOverdueStatus,
-    getCreditSummary
+    getCreditSummary,
+    exportCredits
 } = require('../controllers/creditController');
 
 // All routes require authentication
@@ -22,6 +23,9 @@ router.get('/summary', checkRole(CREDIT_ROLES), getCreditSummary);
 
 // Get all credit accounts
 router.get('/', checkRole(CREDIT_ROLES), getAllCredits);
+
+// Export credits to Excel - Admin or Supervisor
+router.get('/export', checkRole(CREDIT_ROLES), exportCredits);
 
 // Update overdue status - Now accessible to both ADMIN and SUPERVISOR
 router.post('/update-overdue', checkRole(CREDIT_ROLES), updateOverdueStatus);

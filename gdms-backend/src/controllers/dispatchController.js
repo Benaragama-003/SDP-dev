@@ -1,6 +1,7 @@
 const { getConnection } = require('../config/database');
 const { successResponse, errorResponse } = require('../utils/responseHelper');
 const { generateId } = require('../utils/generateId');
+const { createNotification, notifyAllAdmins } = require('../utils/notificationHelper');
 
 // Helper function to record inventory movement
 const recordInventoryMovement = async (connection, data) => {
@@ -266,17 +267,29 @@ const createDispatch = async (req, res, next) => {
                 return errorResponse(res, 400, 'Supervisor is not available');
             }
 
-            // Validate inventory availability
+            // Aggregate items by product_id + product_type to prevent over-allocation
+            // (e.g., same product selected in multiple rows)
+            const aggregatedItems = {};
             for (const item of items) {
                 const product_type = item.product_type || 'FILLED';
                 const quantity = item.loaded_quantity || item.quantity;
+                const key = `${item.product_id}|${product_type}`;
+                if (!aggregatedItems[key]) {
+                    aggregatedItems[key] = { product_id: item.product_id, product_type, totalQuantity: 0 };
+                }
+                aggregatedItems[key].totalQuantity += quantity;
+            }
+
+            // Validate aggregated inventory availability
+            for (const key of Object.keys(aggregatedItems)) {
+                const { product_id, product_type, totalQuantity } = aggregatedItems[key];
                 const [invCheck] = await connection.execute(
                     'SELECT quantity FROM inventory WHERE product_id = ? AND product_type = ?',
-                    [item.product_id, product_type]
+                    [product_id, product_type]
                 );
-                if (invCheck.length === 0 || invCheck[0].quantity < quantity) {
+                if (invCheck.length === 0 || invCheck[0].quantity < totalQuantity) {
                     await connection.rollback();
-                    return errorResponse(res, 400, `Insufficient stock for product ${item.product_id}. Available: ${invCheck[0]?.quantity || 0}, Requested: ${quantity}`);
+                    return errorResponse(res, 400, `Insufficient stock for product ${product_id}. Available: ${invCheck[0]?.quantity || 0}, Total Requested: ${totalQuantity}`);
                 }
             }
 
@@ -342,6 +355,22 @@ const createDispatch = async (req, res, next) => {
                 );
             }
 
+            // Notify the assigned supervisor about the new dispatch
+            await createNotification(connection, {
+                user_id: supervisor_id,
+                title: 'Dispatch Scheduled',
+                message: `Dispatch ${dispatch_number} has been assigned to you for route: ${route || 'N/A'}.`,
+                type: 'DISPATCH_CREATED',
+                reference_id: dispatch_id
+            });
+            // Notify all admins
+            await notifyAllAdmins(connection, {
+                title: 'Dispatch Created',
+                message: `Dispatch ${dispatch_number} has been created for route: ${route || 'N/A'}.`,
+                type: 'DISPATCH_CREATED',
+                reference_id: dispatch_id
+            });
+
             await connection.commit();
             return successResponse(res, 201, 'Dispatch created successfully', { dispatch_id, dispatch_number });
         } catch (error) {
@@ -379,6 +408,16 @@ const startDispatch = async (req, res, next) => {
             [id]
         );
 
+        // Notify all admins that dispatch started
+        const [dspStartInfo] = await pool.execute('SELECT dispatch_number, supervisor_id FROM dispatches WHERE dispatch_id = ?', [id]);
+        const [supStartInfo] = await pool.execute("SELECT CONCAT(first_name, ' ', last_name) as name FROM users WHERE user_id = ?", [dspStartInfo[0].supervisor_id]);
+        await notifyAllAdmins(pool, {
+            title: 'Dispatch Started',
+            message: `${supStartInfo[0].name} has started dispatch ${dspStartInfo[0].dispatch_number}.`,
+            type: 'DISPATCH_STARTED',
+            reference_id: id
+        });
+
         return successResponse(res, 200, 'Dispatch started successfully');
     } catch (error) {
         next(error);
@@ -408,6 +447,16 @@ const requestUnload = async (req, res, next) => {
             'UPDATE dispatches SET status = "AWAITING_UNLOAD" WHERE dispatch_id = ?',
             [id]
         );
+
+        // Notify all admins about unload request
+        const [dspUnloadInfo] = await pool.execute('SELECT dispatch_number, supervisor_id FROM dispatches WHERE dispatch_id = ?', [id]);
+        const [supUnloadInfo] = await pool.execute("SELECT CONCAT(first_name, ' ', last_name) as name FROM users WHERE user_id = ?", [dspUnloadInfo[0].supervisor_id]);
+        await notifyAllAdmins(pool, {
+            title: 'Unload Requested',
+            message: `${supUnloadInfo[0].name} has requested unload for dispatch ${dspUnloadInfo[0].dispatch_number}. Ready to unload.`,
+            type: 'DISPATCH_UNLOAD_REQUESTED',
+            reference_id: id
+        });
 
         return successResponse(res, 200, 'Unload requested. Waiting for admin confirmation.');
     } catch (error) {
@@ -579,6 +628,23 @@ const acceptUnload = async (req, res, next) => {
                 [dispatch[0].supervisor_id]
             );
 
+            // Notify supervisor that unload is complete
+            const [dspDoneInfo] = await connection.execute('SELECT dispatch_number FROM dispatches WHERE dispatch_id = ?', [id]);
+            await createNotification(connection, {
+                user_id: dispatch[0].supervisor_id,
+                title: 'Dispatch Unloaded',
+                message: `Dispatch ${dspDoneInfo[0].dispatch_number} has been successfully unloaded. Stock returned to warehouse.`,
+                type: 'DISPATCH_UNLOADED',
+                reference_id: id
+            });
+            // Notify all admins too
+            await notifyAllAdmins(connection, {
+                title: 'Dispatch Unloaded',
+                message: `Dispatch ${dspDoneInfo[0].dispatch_number} has been successfully unloaded.`,
+                type: 'DISPATCH_UNLOADED',
+                reference_id: id
+            });
+
             await connection.commit();
             return successResponse(res, 200, 'Dispatch unloaded. Stock returned to warehouse.');
         } catch (error) {
@@ -670,6 +736,16 @@ const cancelDispatch = async (req, res, next) => {
                 'UPDATE supervisors SET status = "AVAILABLE" WHERE supervisor_id = ?',
                 [dispatch[0].supervisor_id]
             );
+
+            // Notify supervisor about cancellation
+            const [dispInfo] = await connection.execute('SELECT dispatch_number FROM dispatches WHERE dispatch_id = ?', [id]);
+            await createNotification(connection, {
+                user_id: dispatch[0].supervisor_id,
+                title: 'Dispatch Cancelled',
+                message: `Dispatch ${dispInfo[0].dispatch_number} has been cancelled by the admin.`,
+                type: 'DISPATCH_CANCELLED',
+                reference_id: id
+            });
 
             await connection.commit();
             return successResponse(res, 200, 'Dispatch cancelled. Stock returned to warehouse.');

@@ -22,7 +22,9 @@ const lorryRoutes = require('./routes/lorryRoutes');
 const creditRoutes = require('./routes/creditRoutes');
 const chequeRoutes = require('./routes/chequeRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes');
+const locationRoutes = require('./routes/locationRoutes');
 const salesRoutes = require('./routes/salesRoutes');
+const notificationRoutes = require('./routes/notificationRoutes');
 
 const app = express();
 exports.app = app;
@@ -61,7 +63,9 @@ app.use(`${API_PREFIX}/lorries`, lorryRoutes);
 app.use(`${API_PREFIX}/purchase-orders`, poRoutes);
 app.use(`${API_PREFIX}/credit`, creditRoutes);
 app.use(`${API_PREFIX}/cheques`, chequeRoutes);
+app.use(`${API_PREFIX}/location`, locationRoutes);
 app.use(`${API_PREFIX}/sales`, salesRoutes);
+app.use(`${API_PREFIX}/notifications`, notificationRoutes);
 // 404 handler
 app.use((req, res) => {
   res.status(404).json({

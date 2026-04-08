@@ -387,8 +387,24 @@ CREATE TABLE credit_settlements (
     INDEX idx_date (settlement_date)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE supervisor_locations (
+    supervisor_id VARCHAR(20) PRIMARY KEY,
+    latitude DECIMAL(10, 8) NOT NULL,
+    longitude DECIMAL(11, 8) NOT NULL,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (supervisor_id) REFERENCES supervisors(supervisor_id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-
-
-
-
+-- Notifications Table (In-app notifications for admins and supervisors)
+CREATE TABLE notifications (
+    notification_id VARCHAR(50) PRIMARY KEY,
+    user_id VARCHAR(20) NOT NULL,
+    title VARCHAR(100) NOT NULL,
+    message VARCHAR(500) NOT NULL,
+    type VARCHAR(50) DEFAULT 'GENERAL',
+    reference_id VARCHAR(50) DEFAULT NULL,
+    is_read BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
+    INDEX idx_notifications_user_read (user_id, is_read, created_at DESC)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

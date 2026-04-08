@@ -5,6 +5,7 @@ const { hashPassword, comparePassword } = require('../utils/passwordUtils');
 const { generateId } = require('../utils/generateId');
 const { successResponse, errorResponse } = require('../utils/responseHelper');
 const { sendResetEmail } = require('../utils/emailService');
+const { notifyAllAdmins, createNotification } = require('../utils/notificationHelper');
 
 // Create a JWT token containing user information
 const generateToken = (user) => {
@@ -83,6 +84,14 @@ const register = async (req, res, next) => {
        VALUES (?, 'AVAILABLE')`,
       [user_id]
     );
+
+    // Notify all admins about new user registration
+    await notifyAllAdmins(pool, {
+      title: 'New User Registration',
+      message: `User ${username} (${first_name} ${last_name}) has registered and is waiting for activation.`,
+      type: 'USER_WAITING',
+      reference_id: user_id
+    });
 
     // Generate JWT token
     const token = generateToken({
@@ -301,6 +310,29 @@ const updatePassword = async (req, res, next) => {
   }
 };
 
+// Get user email by username (for Forgot Password prepopulation)
+const getUserEmailForReset = async (req, res, next) => {
+  const { credential } = req.body;
+
+  try {
+    const pool = await getConnection();
+
+    const [users] = await pool.execute(
+      'SELECT email FROM users WHERE username = ? OR email = ?',
+      [credential, credential]
+    );
+
+    if (users.length === 0) {
+      return errorResponse(res, 404, 'User not found');
+    }
+
+    return successResponse(res, 200, 'User email retrieved', { email: users[0].email });
+
+  } catch (error) {
+    next(error);
+  }
+};
+
 // Request Password Reset
 const requestPasswordReset = async (req, res, next) => {
   const { email } = req.body;
@@ -501,6 +533,16 @@ const updateSupervisorStatus = async (req, res, next) => {
         'UPDATE users SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ?',
         [status.toUpperCase(), id]
       );
+
+      // Notify user about account activation
+      if (status.toUpperCase() === 'ACTIVE') {
+        await createNotification(pool, {
+          user_id: id,
+          title: 'Account Activated',
+          message: 'Your account has been activated by an admin. You can now log in and access all features.',
+          type: 'USER_ACTIVATED'
+        });
+      }
     }
 
     // Update monthly_target in supervisors table
@@ -549,8 +591,13 @@ const promoteToAdmin = async (req, res, next) => {
         [id]
       );
 
-      // 4. (Optional) We keep the supervisor record for history or remove it?
-      // For now, let's keep it but mark them as an Admin in the main table.
+      // 4. Notify user about promotion
+      await createNotification(connection, {
+        user_id: id,
+        title: 'Promoted to Admin',
+        message: 'Congratulations! You have been promoted to Restricted Admin (Level 2).',
+        type: 'USER_PROMOTED'
+      });
 
       await connection.commit();
       return successResponse(res, 200, 'Supervisor promoted to Restricted Admin (Level 2) successfully');
@@ -578,5 +625,6 @@ module.exports = {
   getAllSupervisors,
   getAvailableSupervisors,
   updateSupervisorStatus,
-  promoteToAdmin
+  promoteToAdmin,
+  getUserEmailForReset
 };

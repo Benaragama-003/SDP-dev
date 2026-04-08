@@ -83,7 +83,7 @@ const Login = () => {
                                 required
                             />
                             <div className="forgot-password-link" align="right">
-                                <Link to="/forgot-password">Forgot Password?</Link>
+                                <Link to="/forgot-password" state={{ credential }}>Forgot Password?</Link>
                             </div>
                         </div>
                         <button type="submit" className="login-button" disabled={loading}>

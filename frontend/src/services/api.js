@@ -38,6 +38,7 @@ api.interceptors.response.use(
 
 // Auth API methods
 export const authApi = {
+    getEmailForReset: (credential) => api.post('/auth/get-email', { credential }),
     forgotPassword: (email) => api.post('/auth/forgot-password', { email }),
     resetPassword: (token, newPassword) => api.post('/auth/reset-password', { token, newPassword }),
     updateProfile: (data) => api.put('/auth/profile', data),
@@ -127,26 +128,26 @@ export const purchaseOrderApi = {
         const queryString = new URLSearchParams(params).toString();
         return api.get(`/purchase-orders${queryString ? `?${queryString}` : ''}`);
     },
-    
+
     getById: (id) => api.get(`/purchase-orders/${id}`),
-    
+
     create: (data) => api.post('/purchase-orders', data),
-    
+
     approve: (id) => api.put(`/purchase-orders/${id}/approve`),
-    
+
     receive: (id, data = {}) => api.put(`/purchase-orders/${id}/receive`, data),
-    
+
     cancel: (id) => api.put(`/purchase-orders/${id}/cancel`),
-    
+
     // Get available empty stock for refill validation
     getEmptyStock: () => api.get('/purchase-orders/empty-stock'),
 
     // Export purchase orders to Excel (returns blob)
     exportToExcel: (params = {}) => {
-    const queryString = new URLSearchParams(params).toString();
-    return api.get(`/purchase-orders/export${queryString ? `?${queryString}` : ''}`, {
-        responseType: 'blob'
-    });
+        const queryString = new URLSearchParams(params).toString();
+        return api.get(`/purchase-orders/export${queryString ? `?${queryString}` : ''}`, {
+            responseType: 'blob'
+        });
     },
 };
 
@@ -157,31 +158,31 @@ export const dispatchApi = {
         const queryString = new URLSearchParams(params).toString();
         return api.get(`/dispatches${queryString ? `?${queryString}` : ''}`);
     },
-    
+
     // Get single dispatch by ID
     getById: (id) => api.get(`/dispatches/${id}`),
-    
+
     // Get available resources (lorries, supervisors, inventory, routes)
     getResources: () => api.get('/dispatches/resources'),
-    
+
     // Create new dispatch
     create: (data) => api.post('/dispatches', data),
-    
+
     // Start dispatch (SCHEDULED -> IN_PROGRESS)
     start: (id) => api.put(`/dispatches/${id}/start`),
-    
+
     // Request unload (supervisor ends day)
     requestUnload: (id) => api.put(`/dispatches/${id}/request-unload`),
-    
+
     // Accept unload (admin returns stock to warehouse)
     acceptUnload: (id, data = {}) => api.put(`/dispatches/${id}/accept-unload`, data),
-    
+
     // Cancel dispatch
     cancel: (id) => api.put(`/dispatches/${id}/cancel`),
-    
+
     // Update progress (sold/damaged)
     updateProgress: (id, data) => api.put(`/dispatches/${id}/progress`, data),
-    
+
     // Get supervisor's active dispatch
     getMyDispatch: () => api.get('/dispatches/my/active'),
 };
@@ -193,13 +194,13 @@ export const invoiceApi = {
         const queryString = new URLSearchParams(params).toString();
         return api.get(`/invoices${queryString ? `?${queryString}` : ''}`);
     },
-    
+
     // Create new invoice (deducts from lorry stock)
     create: (data) => api.post('/invoices', data),
-    
+
     // Report damage during dispatch
     reportDamage: (data) => api.post('/invoices/report-damage', data),
-    
+
     // Download invoice as PDF
     downloadPDF: (id) => api.get(`/invoices/${id}/pdf`, { responseType: 'blob' }),
     softDelete: (id) => api.put(`/invoices/${id}/delete`),
@@ -215,19 +216,22 @@ export const invoiceApi = {
 export const creditApi = {
     // Get all credit accounts with dealer summary
     getAll: () => api.get('/credit'),
-    
+
+    // Export credit accounts to Excel
+    exportToExcel: () => api.get('/credit/export', { responseType: 'blob' }),
+
     // Get credit summary for dashboard
     getSummary: () => api.get('/credit/summary'),
-    
+
     // Get outstanding credits for a specific dealer
     getDealerCredits: (dealerId) => api.get(`/credit/dealer/${dealerId}`),
-    
+
     // Get settlement history for a dealer
     getHistory: (dealerId) => api.get(`/credit/history/${dealerId}`),
-    
+
     // Settle credit (record payment)
     settle: (data) => api.post('/credit/settle', data),
-    
+
     // Update overdue status
     updateOverdue: () => api.post('/credit/update-overdue'),
 };
@@ -235,6 +239,8 @@ export const creditApi = {
 // Sales API
 export const salesApi = {
     getMySales: (date) => api.get(`/sales/my-sales${date ? `?date=${date}` : ''}`),
+    exportToExcel: (startDate = '', endDate = '') =>
+        api.get(`/sales/export?start_date=${startDate}&end_date=${endDate}`, { responseType: 'blob' }),
     getAllSales: (params = {}) => {
         const queryString = new URLSearchParams(params).toString();
         return api.get(`/sales/all${queryString ? `?${queryString}` : ''}`);
@@ -245,13 +251,28 @@ export const salesApi = {
 export const chequeApi = {
     // Get all cheques
     getAll: () => api.get('/cheques'),
-    
+    exportToExcel: () => api.get('/cheques/export', { responseType: 'blob' }),
     // Update cheque status (CLEARED, RETURNED, CANCELLED)
     updateStatus: (chequePaymentId, data) => api.put(`/cheques/${chequePaymentId}/status`, data),
+};
+
+// Location API
+export const locationApi = {
+    updateLocation: (data) => api.put('/location/update', data),
+    getSupervisorLocations: () => api.get('/location/supervisors'),
 };
 
 // Download PDF
 export const downloadPDF = (id) => api.get(`/invoices/${id}/pdf`, { responseType: 'blob' });
 
+// Notification API
+export const notificationApi = {
+    getAll: (params = {}) => {
+        const queryString = new URLSearchParams(params).toString();
+        return api.get(`/notifications${queryString ? `?${queryString}` : ''}`);
+    },
+    markAsRead: (id) => api.put(`/notifications/${id}/read`),
+    markAllAsRead: () => api.put('/notifications/read-all'),
+};
 
 export default api;

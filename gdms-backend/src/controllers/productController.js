@@ -1,6 +1,7 @@
 const { getConnection } = require('../config/database');
 const { successResponse, errorResponse } = require('../utils/responseHelper');
 const ExcelJS = require('exceljs');
+const { notifyAllAdmins } = require('../utils/notificationHelper');
 
 // Helper: Record inventory movement (audit trail)
 const recordInventoryMovement = async (connection, {
@@ -352,6 +353,16 @@ const reportDamage = async (req, res, next) => {
             });
 
             await connection.commit();
+
+            // Notify all admins about warehouse damage
+            const [dmgProd] = await pool.execute('SELECT cylinder_size FROM products WHERE product_id = ?', [product_id]);
+            await notifyAllAdmins(pool, {
+                title: 'Damage Reported (Warehouse)',
+                message: `${quantity_damaged} x ${dmgProd[0]?.cylinder_size || product_id} damaged in warehouse. Reason: ${damage_reason}.`,
+                type: 'DAMAGE_REPORTED',
+                reference_id: damage_id
+            });
+
             return successResponse(res, 201, 'Damage reported successfully', { damage_id });
         } catch (error) {
             await connection.rollback();

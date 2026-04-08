@@ -13,4 +13,7 @@ router.get('/', checkRole(['ADMIN']), chequeController.getAllCheques);
 // Update cheque status - Admin only
 router.put('/:cheque_payment_id/status', checkRole(['ADMIN']), chequeController.updateChequeStatus);
 
+// Export cheques to Excel - Admin only
+router.get('/export', checkRole(['ADMIN']), chequeController.exportCheques);
+
 module.exports = router;

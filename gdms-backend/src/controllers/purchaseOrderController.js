@@ -2,6 +2,7 @@ const { getConnection } = require('../config/database');
 const { successResponse, errorResponse } = require('../utils/responseHelper');
 const { generateId } = require('../utils/generateId');
 const ExcelJS = require('exceljs');
+const { notifyAllAdmins } = require('../utils/notificationHelper');
 
 // Helper function to record inventory movement
 const recordInventoryMovement = async (connection, data) => {
@@ -20,9 +21,9 @@ const getNextPONumber = async (connection) => {
         `SELECT order_number FROM purchase_orders 
          ORDER BY created_at DESC, order_number DESC LIMIT 1`
     );
-    
+
     let nextNumber = 1;
-    
+
     if (lastPO.length > 0) {
         const lastOrderNumber = lastPO[0].order_number;
         const match = lastOrderNumber.match(/PO-(\d+)/);
@@ -30,10 +31,10 @@ const getNextPONumber = async (connection) => {
             nextNumber = parseInt(match[1], 10) + 1;
         }
     }
-    
+
     // Format: PO-01, PO-02, ..., PO-99, PO-100, PO-1000
     const formattedNumber = nextNumber.toString().padStart(2, '0');
-    
+
     return `PO-${formattedNumber}`;
 };
 
@@ -46,7 +47,7 @@ const getAllPurchaseOrders = async (req, res, next) => {
 
     try {
         const pool = await getConnection();
-        
+
         let query = `
             SELECT 
                 po.*,
@@ -145,8 +146,9 @@ const getPurchaseOrderById = async (req, res, next) => {
 
 // Create a new purchase order
 const createPurchaseOrder = async (req, res, next) => {
-    const { expected_date, items, supplier_contact, notes } = req.body;
+    const { expected_date, items, supplier, supplier_contact, notes } = req.body;
     const created_by = req.user.userId;
+    const supplierName = supplier || 'Laugfs Gas PLC';
 
     if (!items || items.length === 0) {
         return errorResponse(res, 400, 'At least one item is required');
@@ -164,30 +166,31 @@ const createPurchaseOrder = async (req, res, next) => {
                     'SELECT status, cylinder_size FROM products WHERE product_id = ?',
                     [item.product_id]
                 );
-                
+
                 if (productCheck.length === 0) {
                     await connection.rollback();
                     return errorResponse(res, 400, `Product ${item.product_id} not found`);
                 }
-                
+
                 if (productCheck[0].status !== 'ACTIVE') {
                     await connection.rollback();
                     return errorResponse(res, 400, `Cannot order discontinued product: ${productCheck[0].cylinder_size}. This product is no longer active.`);
                 }
             }
 
+
             const order_id = generateId('PO');
-            
+
             // Generate sequential PO number (PO-01, PO-02, etc.)
             const order_number = await getNextPONumber(connection);
-            
+
             const subtotal = items.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0);
 
             await connection.execute(
                 `INSERT INTO purchase_orders 
-                 (order_id, order_number, expected_delivery_date, subtotal, total_amount, status, supplier_contact, created_by)
-                 VALUES (?, ?, ?, ?, ?, 'PENDING', ?, ?)`,
-                [order_id, order_number, expected_date, subtotal, subtotal, supplier_contact || null, created_by]
+                 (order_id, order_number, expected_delivery_date, supplier, subtotal, total_amount, status, supplier_contact, created_by)
+                 VALUES (?, ?, ?, ?, ?, ?, 'PENDING', ?, ?)`,
+                [order_id, order_number, expected_date, supplierName, subtotal, subtotal, supplier_contact || null, created_by]
             );
 
             for (const item of items) {
@@ -196,16 +199,24 @@ const createPurchaseOrder = async (req, res, next) => {
                      (order_item_id, order_id, product_id, purchase_type, ordered_quantity, unit_price, total_price)
                      VALUES (?, ?, ?, ?, ?, ?, ?)`,
                     [
-                        generateId('POI'), 
-                        order_id, 
-                        item.product_id, 
-                        item.purchase_type || 'FILLED', 
-                        item.quantity, 
-                        item.unit_price, 
+                        generateId('POI'),
+                        order_id,
+                        item.product_id,
+                        item.purchase_type || 'FILLED',
+                        item.quantity,
+                        item.unit_price,
                         item.quantity * item.unit_price
                     ]
                 );
             }
+
+            // Notify all admins about new PO
+            await notifyAllAdmins(connection, {
+                title: 'Purchase Order Created',
+                message: `Purchase Order ${order_number} has been created (${supplierName}).`,
+                type: 'PO_CREATED',
+                reference_id: order_id
+            });
 
             await connection.commit();
             return successResponse(res, 201, 'Purchase Order created successfully', { order_id, order_number });
@@ -248,6 +259,15 @@ const approvePurchaseOrder = async (req, res, next) => {
              WHERE order_id = ?`,
             [approved_by, id]
         );
+
+        // Notify all admins about PO approval
+        const [poInfo] = await pool.execute('SELECT order_number, supplier FROM purchase_orders WHERE order_id = ?', [id]);
+        await notifyAllAdmins(pool, {
+            title: 'Purchase Order Approved',
+            message: `Purchase Order ${poInfo[0].order_number} has been approved.`,
+            type: 'PO_APPROVED',
+            reference_id: id
+        });
 
         return successResponse(res, 200, 'Purchase order approved successfully');
     } catch (error) {
@@ -296,7 +316,7 @@ const receivePurchaseOrder = async (req, res, next) => {
                 if (poItem.purchase_type === 'FILLED') {
                     const receivedData = received_items?.find(ri => ri.order_item_id === poItem.order_item_id);
                     const receivedQty = receivedData?.received_quantity ?? poItem.ordered_quantity;
-                    
+
                     if (receivedQty > 0) {
                         // Check available empty stock
                         const [emptyRows] = await connection.execute(
@@ -304,10 +324,10 @@ const receivePurchaseOrder = async (req, res, next) => {
                             [poItem.product_id, 'EMPTY']
                         );
                         const availableEmpty = emptyRows.length > 0 ? emptyRows[0].quantity : 0;
-                        
+
                         if (receivedQty > availableEmpty) {
                             await connection.rollback();
-                            return errorResponse(res, 400, 
+                            return errorResponse(res, 400,
                                 `Cannot receive ${receivedQty} refills for ${poItem.cylinder_size}. Only ${availableEmpty} empty cylinders available. ` +
                                 `Refills require empty cylinders for exchange.`
                             );
@@ -334,16 +354,16 @@ const receivePurchaseOrder = async (req, res, next) => {
                             'SELECT inventory_id, quantity FROM inventory WHERE product_id = ? AND product_type = ?',
                             [poItem.product_id, 'EMPTY']
                         );
-                        
+
                         const currentEmptyQty = emptyRows[0].quantity;
                         const newEmptyQty = currentEmptyQty - receivedQty;
-                        
+
                         // Deduct from EMPTY inventory
                         await connection.execute(
                             'UPDATE inventory SET quantity = ?, last_updated = NOW() WHERE product_id = ? AND product_type = ?',
                             [newEmptyQty, poItem.product_id, 'EMPTY']
                         );
-                        
+
                         // Record movement for EMPTY deduction
                         await recordInventoryMovement(connection, {
                             product_id: poItem.product_id,
@@ -401,7 +421,7 @@ const receivePurchaseOrder = async (req, res, next) => {
                 'SELECT received_quantity, unit_price FROM PO_items WHERE order_id = ?',
                 [id]
             );
-            const actualTotal = updatedItems.reduce((sum, item) => 
+            const actualTotal = updatedItems.reduce((sum, item) =>
                 sum + (item.received_quantity * parseFloat(item.unit_price)), 0
             );
 
@@ -418,6 +438,15 @@ const receivePurchaseOrder = async (req, res, next) => {
                  WHERE order_id = ?`,
                 [received_by, supplier_invoice_number || null, actualTotal, actualTotal, id]
             );
+
+            // Notify all admins about PO received
+            const [poRecInfo] = await connection.execute('SELECT order_number FROM purchase_orders WHERE order_id = ?', [id]);
+            await notifyAllAdmins(connection, {
+                title: 'Purchase Order Received',
+                message: `Purchase Order ${poRecInfo[0].order_number} has been received and inventory updated.`,
+                type: 'PO_RECEIVED',
+                reference_id: id
+            });
 
             await connection.commit();
             return successResponse(res, 200, 'Purchase order received and inventory updated successfully');
@@ -457,6 +486,15 @@ const cancelPurchaseOrder = async (req, res, next) => {
             [id]
         );
 
+        // Notify all admins about PO cancellation
+        const [poCancelInfo] = await pool.execute('SELECT order_number FROM purchase_orders WHERE order_id = ?', [id]);
+        await notifyAllAdmins(pool, {
+            title: 'Purchase Order Cancelled',
+            message: `Purchase Order ${poCancelInfo[0].order_number} has been cancelled.`,
+            type: 'PO_CANCELLED',
+            reference_id: id
+        });
+
         return successResponse(res, 200, 'Purchase order cancelled successfully');
     } catch (error) {
         next(error);
@@ -467,7 +505,7 @@ const cancelPurchaseOrder = async (req, res, next) => {
 const getEmptyStock = async (req, res, next) => {
     try {
         const pool = await getConnection();
-        
+
         const [rows] = await pool.execute(`
             SELECT 
                 p.product_id,
@@ -479,7 +517,7 @@ const getEmptyStock = async (req, res, next) => {
             WHERE p.status = 'ACTIVE'
             ORDER BY CAST(REGEXP_REPLACE(p.cylinder_size, '[^0-9.]', '') AS DECIMAL(10,2))
         `);
-        
+
         return successResponse(res, 200, 'Empty stock retrieved', rows);
     } catch (error) {
         next(error);
@@ -535,7 +573,7 @@ const exportPurchaseOrdersToExcel = async (req, res, next) => {
         }
 
         query += ' ORDER BY po.order_date DESC, po.order_number DESC, p.product_code';
-        
+
         const [orders] = await pool.execute(query, params);
 
         // Create workbook
@@ -572,7 +610,7 @@ const exportPurchaseOrdersToExcel = async (req, res, next) => {
             'Order Total (Rs)',
             'Created By'
         ];
-        
+
         sheet.getRow(6).eachCell(cell => {
             cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF6B21A8' } };
             cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
@@ -602,10 +640,10 @@ const exportPurchaseOrdersToExcel = async (req, res, next) => {
             const orderItems = orderGroups[orderNumber];
             const startRow = currentRow;
             const itemCount = orderItems.length;
-            
+
             orderItems.forEach((order, index) => {
                 const row = sheet.getRow(currentRow);
-                
+
                 row.values = [
                     new Date(order.order_date).toLocaleDateString(),
                     order.order_number,
@@ -627,7 +665,7 @@ const exportPurchaseOrdersToExcel = async (req, res, next) => {
                         left: { style: 'thin' },
                         right: { style: 'thin' }
                     };
-                    
+
                     cell.alignment = { vertical: 'middle' };
 
                     // Highlight received quantity if doesn't match ordered
@@ -653,23 +691,23 @@ const exportPurchaseOrdersToExcel = async (req, res, next) => {
             // Merge cells for orders with multiple items
             if (itemCount > 1) {
                 const endRow = currentRow - 1;
-                
+
                 // Merge Order Date (Column A)
                 sheet.mergeCells(`A${startRow}:A${endRow}`);
                 sheet.getCell(`A${startRow}`).alignment = { horizontal: 'center', vertical: 'middle' };
-                
+
                 // Merge Order No (Column B)
                 sheet.mergeCells(`B${startRow}:B${endRow}`);
                 sheet.getCell(`B${startRow}`).alignment = { horizontal: 'center', vertical: 'middle' };
-                
+
                 // Merge Invoice No (Column C)
                 sheet.mergeCells(`C${startRow}:C${endRow}`);
                 sheet.getCell(`C${startRow}`).alignment = { horizontal: 'center', vertical: 'middle' };
-                
+
                 // Merge Order Total (Column J)
                 sheet.mergeCells(`J${startRow}:J${endRow}`);
                 sheet.getCell(`J${startRow}`).alignment = { horizontal: 'right', vertical: 'middle' };
-                
+
                 // Merge Created By (Column K)
                 sheet.mergeCells(`K${startRow}:K${endRow}`);
                 sheet.getCell(`K${startRow}`).alignment = { horizontal: 'center', vertical: 'middle' };
@@ -680,7 +718,7 @@ const exportPurchaseOrdersToExcel = async (req, res, next) => {
         if (orders.length > 0) {
             currentRow++; // Empty row
             const summaryRow = sheet.getRow(currentRow);
-            
+
             // Calculate unique order totals (to avoid counting same order multiple times)
             const uniqueOrders = {};
             orders.forEach(order => {
@@ -695,7 +733,7 @@ const exportPurchaseOrdersToExcel = async (req, res, next) => {
                 grandTotal.toFixed(2),
                 ''
             ];
-            
+
             summaryRow.eachCell((cell, colNumber) => {
                 cell.font = { bold: true, size: 12 };
                 cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE5E7EB' } };

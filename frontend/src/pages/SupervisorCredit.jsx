@@ -21,7 +21,7 @@ const SupervisorCredit = () => {
     const [showSettleModal, setShowSettleModal] = useState(false);
     const [showHistoryModal, setShowHistoryModal] = useState(false);
     const [loadingDetails, setLoadingDetails] = useState(false);
-    
+
     const [selectedCreditId, setSelectedCreditId] = useState('');
     const [paymentMethod, setPaymentMethod] = useState('CASH');
     const [chequeDetails, setChequeDetails] = useState({ number: '', bank: '', branch: '', date: '' });
@@ -34,7 +34,7 @@ const SupervisorCredit = () => {
     const fetchCredits = async () => {
         setLoading(true);
         try {
-            
+
             const response = await creditApi.getAll();
             const data = response.data.data;
             setCreditAccounts(data.credits || []);
@@ -55,7 +55,7 @@ const SupervisorCredit = () => {
         setSelectedCreditId('');
         setPaymentMethod('CASH');
         setChequeDetails({ number: '', bank: '', branch: '', date: '' });
-        
+
         try {
             const response = await creditApi.getDealerCredits(account.dealer_id);
             setDealerCredits(response.data.data.credits || []);
@@ -72,7 +72,7 @@ const SupervisorCredit = () => {
         setSelectedAccount(account);
         setShowHistoryModal(true);
         setLoadingDetails(true);
-        
+
         try {
             const response = await creditApi.getHistory(account.dealer_id);
             setSettlementHistory(response.data.data || []);
@@ -96,15 +96,15 @@ const SupervisorCredit = () => {
             alert("Please select an invoice first!");
             return;
         }
-        
+
         const amount = Number(e.target.amount.value);
         const selectedCredit = dealerCredits.find(c => c.credit_id === selectedCreditId);
-        
+
         if (!selectedCredit) {
             alert("Invalid credit selection");
             return;
         }
-        
+
         if (amount > parseFloat(selectedCredit.remaining_balance)) {
             alert(`Amount cannot exceed remaining balance (Rs. ${parseFloat(selectedCredit.remaining_balance).toLocaleString()})`);
             return;
@@ -120,13 +120,13 @@ const SupervisorCredit = () => {
             };
 
             await creditApi.settle(payload);
-            
+
             alert(`Successfully settled Rs. ${amount.toLocaleString()} for ${selectedCredit.invoice_number}`);
             setShowSettleModal(false);
             setSelectedCreditId('');
             setPaymentMethod('CASH');
             setChequeDetails({ number: '', bank: '', branch: '', date: '' });
-            
+
             // Refresh data
             fetchCredits();
         } catch (err) {
@@ -228,7 +228,7 @@ const SupervisorCredit = () => {
                                 />
                             </div>
                         </div>
-                        
+
                         {filtered.length === 0 ? (
                             <div style={{ textAlign: 'center', padding: '40px', color: '#666' }}>
                                 {searchTerm ? 'No dealers match your search.' : 'No outstanding credits found.'}
@@ -298,7 +298,7 @@ const SupervisorCredit = () => {
                 {/* Settle Modal */}
                 {showSettleModal && selectedAccount && (
                     <div className="modal-overlay" onClick={() => setShowSettleModal(false)}>
-                        <div className="modal-content" onClick={e => e.stopPropagation()} style={{ backgroundColor: '#fff', borderRadius: '20px', maxWidth: '500px', padding: '0', overflow: 'hidden', boxShadow: '0 15px 35px rgba(0,0,0,0.2)' }}>
+                        <div className="modal-content" onClick={e => e.stopPropagation()} style={{ backgroundColor: '#fff', borderRadius: '20px', maxWidth: '500px', padding: '0', overflow: 'hidden', boxShadow: '0 15px 35px rgba(0,0,0,0.2)', maxHeight: '90vh', overflowY: 'auto' }}>
                             <div className="modal-header" style={{ padding: '25px 30px', borderBottom: '1px solid #eee', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                 <h1 style={{ fontSize: '22px', fontWeight: 'bold', margin: '0', color: '#333' }}>Settle Payment</h1>
                                 <button className="modal-close" onClick={() => setShowSettleModal(false)} style={{ fontSize: '24px', border: 'none', background: 'none', cursor: 'pointer', color: '#999' }}>×</button>
@@ -359,13 +359,21 @@ const SupervisorCredit = () => {
                                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '10px' }}>
                                                 <input type="text" placeholder="Cheque Number" required style={{ padding: '10px', borderRadius: '8px', border: '1px solid #ddd', outline: 'none', fontSize: '14px' }}
                                                     value={chequeDetails.number} onChange={(e) => setChequeDetails({ ...chequeDetails, number: e.target.value })} />
-                                                <input type="text" placeholder="Bank Name" required style={{ padding: '10px', borderRadius: '8px', border: '1px solid #ddd', outline: 'none', fontSize: '14px' }}
+                                                <input type="text" placeholder="Bank Name" required style={{ padding: '10px', borderRadius: '8px', border: '1px solid #ddd', outline: 'none', fontSize: '14px', width: '100%' }}
                                                     value={chequeDetails.bank} onChange={(e) => setChequeDetails({ ...chequeDetails, bank: e.target.value })} />
                                             </div>
                                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                                                 <input type="text" placeholder="Branch" required style={{ padding: '10px', borderRadius: '8px', border: '1px solid #ddd', outline: 'none', fontSize: '14px' }}
                                                     value={chequeDetails.branch} onChange={(e) => setChequeDetails({ ...chequeDetails, branch: e.target.value })} />
-                                                <DateInput value={chequeDetails.date} min={today} onChange={(value) => setChequeDetails({ ...chequeDetails, date: value })} required />
+                                                <div style={{ position: 'relative' }}>
+                                                    <DateInput
+                                                        value={chequeDetails.date}
+                                                        min={today}
+                                                        onChange={(value) => setChequeDetails({ ...chequeDetails, date: value })}
+                                                        required
+                                                        style={{ padding: '10px', borderRadius: '8px', border: '1px solid #ddd', outline: 'none', fontSize: '14px', width: '100%', boxSizing: 'border-box' }}
+                                                    />
+                                                </div>
                                             </div>
                                         </div>
                                     )}
@@ -375,15 +383,15 @@ const SupervisorCredit = () => {
                                         <input type="number" name="amount" required min="1" placeholder="Enter settlement amount"
                                             style={{ width: '100%', padding: '12px 15px', borderRadius: '10px', border: '1px solid #ddd', fontSize: '16px', outline: 'none' }} />
                                     </div>
-                                    
-                                    <div style={{ display: 'flex', gap: '15px' }}>
+
+                                    <div style={{ display: 'flex', gap: '12px', marginTop: '10px' }}>
                                         <button type="button" onClick={() => setShowSettleModal(false)} disabled={submitting}
-                                            style={{ flex: 1, backgroundColor: '#dc3545', color: 'white', border: 'none', padding: '12px', borderRadius: '12px', fontSize: '16px', fontWeight: '600', cursor: 'pointer', opacity: submitting ? 0.6 : 1 }}>
+                                            style={{ flex: 1, backgroundColor: 'transparent', color: '#666', border: '2px solid #ddd', padding: '14px', borderRadius: '12px', fontSize: '15px', fontWeight: '600', cursor: 'pointer', opacity: submitting ? 0.6 : 1, transition: 'all 0.2s' }}>
                                             Cancel
                                         </button>
                                         <button type="submit" disabled={submitting}
-                                            style={{ flex: 1.5, backgroundColor: '#bfbf2a', color: 'white', border: 'none', padding: '12px', borderRadius: '12px', fontSize: '16px', fontWeight: '600', cursor: 'pointer', opacity: submitting ? 0.6 : 1 }}>
-                                            {submitting ? 'Settling...' : 'Settle Now'}
+                                            style={{ flex: 1.5, backgroundColor: '#101540', color: 'white', border: 'none', padding: '14px', borderRadius: '12px', fontSize: '15px', fontWeight: '600', cursor: 'pointer', opacity: submitting ? 0.6 : 1, transition: 'all 0.2s' }}>
+                                            {submitting ? 'Settling...' : '✓ Settle Payment'}
                                         </button>
                                     </div>
                                 </div>
@@ -446,8 +454,8 @@ const SupervisorCredit = () => {
                                 )}
                                 <div style={{ marginTop: '30px', textAlign: 'center' }}>
                                     <button onClick={() => setShowHistoryModal(false)}
-                                        style={{ backgroundColor: '#dc3545', color: 'white', border: 'none', padding: '12px 60px', borderRadius: '30px', fontSize: '16px', fontWeight: '600', cursor: 'pointer' }}>
-                                        Close History
+                                        style={{ backgroundColor: 'transparent', color: '#666', border: '2px solid #ddd', padding: '12px 60px', borderRadius: '30px', fontSize: '15px', fontWeight: '600', cursor: 'pointer', transition: 'all 0.2s' }}>
+                                        Close
                                     </button>
                                 </div>
                             </div>

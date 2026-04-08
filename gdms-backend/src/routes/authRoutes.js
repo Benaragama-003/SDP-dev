@@ -17,7 +17,8 @@ const {
   getAllSupervisors,
   getAvailableSupervisors,
   updateSupervisorStatus,
-  promoteToAdmin
+  promoteToAdmin,
+  getUserEmailForReset
 } = require('../controllers/authController');
 
 const router = express.Router();
@@ -99,6 +100,11 @@ router.put('/password', authenticateToken, updatePasswordValidation, validate, u
 
 //Logout (invalidate token)
 router.post('/logout', authenticateToken, logout);
+
+// Get Email for Password Reset (Public)
+router.post('/get-email', [
+  body('credential').notEmpty().withMessage('Username or Email is required')
+], validate, getUserEmailForReset);
 
 // Forgot Password (Public)
 router.post('/forgot-password', [

@@ -25,6 +25,9 @@ body.sidebar-collapsed .dispatch-container {
 
 .dashboard-header {
     margin-bottom: 30px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
 }
 
 .header-title {

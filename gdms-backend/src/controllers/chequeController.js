@@ -1,4 +1,5 @@
 const { getConnection } = require('../config/database');
+const ExcelJS = require('exceljs');
 const { successResponse, errorResponse } = require('../utils/responseHelper');
 const { generateId } = require('../utils/generateId');
 
@@ -213,7 +214,74 @@ const updateChequeStatus = async (req, res, next) => {
     }
 };
 
+const exportCheques = async (req, res, next) => {
+    try {
+        const pool = await getConnection();
+        const [rows] = await pool.execute(`
+            SELECT 
+                cp.cheque_number,
+                cp.cheque_date,
+                cp.bank_name,
+                cp.branch_name,
+                cp.clearance_status,
+                p.amount,
+                d.dealer_name,
+                i.invoice_number
+            FROM cheque_payments cp
+            JOIN payments p ON cp.cheque_payment_id = p.payment_id
+            JOIN invoices i ON p.invoice_id = i.invoice_id
+            JOIN dealers d ON i.dealer_id = d.dealer_id
+            ORDER BY cp.cheque_date DESC
+        `);
+
+        if (rows.length === 0) {
+            return errorResponse(res, 404, 'No cheques found to export');
+        }
+
+        const workbook = new ExcelJS.Workbook();
+        const sheet = workbook.addWorksheet('Cheques Report');
+
+        sheet.mergeCells('A1:H1');
+        sheet.getCell('A1').value = 'HIDELLANA DISTRIBUTORS - CHEQUE REPORT';
+        sheet.getCell('A1').font = { bold: true, size: 14 };
+        sheet.getCell('A1').alignment = { horizontal: 'center' };
+
+        sheet.getRow(3).values = [
+            'Cheque No', 'Cheque Date', 'Bank', 'Branch', 'Status', 'Amount (Rs)', 'Dealer', 'Invoice'
+        ];
+
+        sheet.getRow(3).eachCell(cell => {
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF101540' } };
+            cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+        });
+
+        rows.forEach((row, idx) => {
+            sheet.addRow([
+                row.cheque_number,
+                new Date(row.cheque_date).toLocaleDateString(),
+                row.bank_name,
+                row.branch_name,
+                row.clearance_status,
+                parseFloat(row.amount).toFixed(2),
+                row.dealer_name,
+                row.invoice_number
+            ]);
+        });
+
+        sheet.columns.forEach(col => { col.width = 15; });
+        sheet.getColumn(7).width = 25; // Dealer name
+
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', 'attachment; filename="cheques_report.xlsx"');
+        await workbook.xlsx.write(res);
+        res.end();
+    } catch (error) {
+        next(error);
+    }
+};
+
 module.exports = {
     getAllCheques,
-    updateChequeStatus
+    updateChequeStatus,
+    exportCheques
 };

@@ -13,11 +13,20 @@ const AdminSales = () => {
     const [salesList, setSalesList] = useState([]);
     const [selectedSale, setSelectedSale] = useState(null);
     const [showDetailModal, setShowDetailModal] = useState(false);
-
+    const [showExportModal, setShowExportModal] = useState(false);
+    const [exportLoading, setExportLoading] = useState(false);
+    const [exportFilters, setExportFilters] = useState({
+        start_date: '',
+        end_date: ''
+    });
     useEffect(() => {
         const fetchSales = async () => {
             try {
-                const res = await salesApi.getAllSales({ range: dateRange, date: selectedDate });
+                // Only send 'date' when user picked a specific date (custom range)
+                const params = dateRange === 'custom'
+                    ? { range: 'custom', date: selectedDate }
+                    : { range: dateRange };
+                const res = await salesApi.getAllSales(params);
                 setStats(res.data.data.stats);
                 setSalesList(res.data.data.sales);
             } catch (err) {
@@ -32,27 +41,64 @@ const AdminSales = () => {
         setShowDetailModal(true);
     };
 
+    const handleExport = async () => {
+        try {
+            if (!exportFilters.start_date || !exportFilters.end_date) {
+                alert("Please select both start and end dates");
+                return;
+            }
+            if (new Date(exportFilters.start_date) > new Date(exportFilters.end_date)) {
+                alert("From Date cannot be later than To Date");
+                return;
+            }
+            setExportLoading(true);
+            const response = await salesApi.exportToExcel(exportFilters.start_date, exportFilters.end_date);
+            const url = window.URL.createObjectURL(new Blob([response.data]));
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', `sales_report_${exportFilters.start_date}_to_${exportFilters.end_date}.xlsx`);
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            setShowExportModal(false);
+        } catch (error) {
+            console.error('Export failed:', error);
+            const errorMessage = error.response?.data?.message || 'Failed to export sales list';
+            alert(errorMessage);
+        } finally {
+            setExportLoading(false);
+        }
+    };
+
     return (
         <>
             <AdminSidebar />
             <div className="dashboard-container">
                 <main className="dashboard-main">
                     <div className="page-header">
-                        <div>
-                            <h1 className="page-title">Sales Overview</h1>
-                            <p className="page-subtitle">Track sales performance and metrics</p>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                            <div>
+                                <h1 className="page-title">Sales Overview</h1>
+                                <p className="page-subtitle">Track sales performance and metrics</p>
+                            </div>
+                            <button className="btn btn-primary" onClick={() => setShowExportModal(true)}>
+                                <Download size={20} />
+                                Export Report
+                            </button>
                         </div>
-                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                            <select
-                                className="filter-select"
-                                value={dateRange}
-                                onChange={(e) => setDateRange(e.target.value)}
-                            >
-                                <option value="today">Today</option>
-                                <option value="week">This Week</option>
-                                <option value="month">This Month</option>
-                            </select>
-                            <div style={{ width: '150px' }}>
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '20px' }}>
+                        <select
+                            className="filter-select"
+                            value={dateRange}
+                            onChange={(e) => setDateRange(e.target.value)}
+                        >
+                            <option value="today">Today</option>
+                            <option value="week">This Week</option>
+                            <option value="month">This Month</option>
+                        </select>
+                        <div style={{ width: '150px' }}>
                             <DateInput
                                 value={selectedDate}
                                 onChange={(value) => {
@@ -61,11 +107,6 @@ const AdminSales = () => {
                                 }}
                                 className="filter-select"
                             />
-                            </div>
-                            <button className="btn btn-primary">
-                                <Download size={20} />
-                                Export Report
-                            </button>
                         </div>
                     </div>
 
@@ -109,6 +150,7 @@ const AdminSales = () => {
                             <thead>
                                 <tr>
                                     <th>Date</th>
+                                    <th>Dispatch No</th>
                                     <th>Lorry</th>
                                     <th>Supervisor</th>
                                     <th>Items Sold</th>
@@ -119,9 +161,10 @@ const AdminSales = () => {
                             <tbody>
                                 {salesList.map((sale, index) => (
                                     <tr key={index}>
-                                        <td>{formatDate(sale.sale_date)}</td>
+                                        <td>{formatDate(sale.sale_date || sale.dispatch_date)}</td>
+                                        <td><span className="badge badge-secondary">{sale.dispatch_no || sale.dispatch_id}</span></td>
                                         <td>{sale.lorry}</td>
-                                        <td>{sale.supervisor}</td>
+                                        <td>{sale.supervisor || sale.supervisor_name}</td>
                                         <td>{sale.cylinders_sold} cylinders</td>
                                         <td>Rs. {parseFloat(sale.total_amount).toLocaleString()}</td>
                                         <td>
@@ -179,6 +222,98 @@ const AdminSales = () => {
                             </div>
                             <div className="modal-footer" style={{ padding: '20px', borderTop: '1px solid #eee' }}>
                                 <button className="btn btn-secondary" style={{ width: '100%' }} onClick={() => setShowDetailModal(false)}>Close</button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Export Modal */}
+                {showExportModal && (
+                    <div className="modal-overlay" onClick={() => !exportLoading && setShowExportModal(false)}>
+                        <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '500px' }}>
+                            <div className="modal-header">
+                                <h2 className="modal-title">
+                                    <Download size={24} style={{ marginRight: '10px' }} />
+                                    Export Sales
+                                </h2>
+                                <button
+                                    className="modal-close"
+                                    onClick={() => !exportLoading && setShowExportModal(false)}
+                                    disabled={exportLoading}
+                                >×</button>
+                            </div>
+
+                            <div className="modal-body" style={{ padding: '20px' }}>
+                                <div style={{ marginBottom: '15px' }}>
+                                    <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500' }}>
+                                        From Date
+                                    </label>
+                                    <input
+                                        type="date"
+                                        value={exportFilters.start_date}
+                                        max={new Date().toISOString().split('T')[0]}
+                                        onChange={e => setExportFilters(f => ({ ...f, start_date: e.target.value }))}
+                                        style={{
+                                            width: '100%',
+                                            padding: '10px',
+                                            borderRadius: '6px',
+                                            border: '1px solid #ddd',
+                                            fontSize: '14px'
+                                        }}
+                                        disabled={exportLoading}
+                                    />
+                                </div>
+
+                                <div style={{ marginBottom: '15px' }}>
+                                    <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500' }}>
+                                        To Date
+                                    </label>
+                                    <input
+                                        type="date"
+                                        value={exportFilters.end_date}
+                                        max={new Date().toISOString().split('T')[0]}
+                                        onChange={e => setExportFilters(f => ({ ...f, end_date: e.target.value }))}
+                                        style={{
+                                            width: '100%',
+                                            padding: '10px',
+                                            borderRadius: '6px',
+                                            border: '1px solid #ddd',
+                                            fontSize: '14px'
+                                        }}
+                                        disabled={exportLoading}
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="modal-footer" style={{
+                                padding: '15px 20px',
+                                display: 'flex',
+                                justifyContent: 'flex-end',
+                                gap: '10px',
+                                borderTop: '1px solid #eee'
+                            }}>
+                                <button
+                                    className="btn btn-secondary"
+                                    onClick={() => setShowExportModal(false)}
+                                    disabled={exportLoading}
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    className="btn btn-primary"
+                                    onClick={handleExport}
+                                    disabled={exportLoading}
+                                    style={{ minWidth: '120px' }}
+                                >
+                                    {exportLoading ? (
+                                        'Exporting...'
+                                    ) : (
+                                        <>
+                                            <Download size={18} />
+                                            Export
+                                        </>
+                                    )}
+                                </button>
                             </div>
                         </div>
                     </div>

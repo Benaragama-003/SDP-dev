@@ -1,11 +1,17 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import AdminSidebar from '../../components/AdminSidebar';
 import { MapPin, Truck, Plus, FileText, RefreshCw } from 'lucide-react';
 import '../../styles/Dispatch.css';
 import { formatDate } from '../../utils/dateUtils';
 import DateInput from '../../components/DateInput';
-import { dispatchApi } from '../../services/api';
+import { dispatchApi, locationApi } from '../../services/api';
+import { GoogleMap, useJsApiLoader, Marker, InfoWindow } from '@react-google-maps/api';
+
+// Map configuration
+const MAP_CENTER = { lat: 6.6828, lng: 80.3992 }; // Ratnapura/Hidellana, Sri Lanka
+const MAP_CONTAINER_STYLE = { width: '100%', height: '350px', borderRadius: '12px' };
+const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
 
 const AdminDispatch = () => {
     const navigate = useNavigate();
@@ -24,9 +30,33 @@ const AdminDispatch = () => {
     const [loading, setLoading] = useState(true);
     const [submitting, setSubmitting] = useState(false);
 
+    // Supervisor location state
+    const [supervisorLocations, setSupervisorLocations] = useState([]);
+    const [selectedMarker, setSelectedMarker] = useState(null);
+
+    // Load Google Maps script (handles re-mounting gracefully)
+    const { isLoaded } = useJsApiLoader({
+        googleMapsApiKey: GOOGLE_MAPS_API_KEY,
+    });
+
+    // Fetch supervisor locations
+    const fetchLocations = useCallback(async () => {
+        try {
+            const res = await locationApi.getSupervisorLocations();
+            setSupervisorLocations(res.data.data || []);
+        } catch (err) {
+            console.error('Failed to fetch supervisor locations:', err);
+        }
+    }, []);
+
     // Fetch resources and dispatches on mount
     useEffect(() => {
         fetchData();
+        fetchLocations();
+
+        // Auto-refresh locations every 30 seconds
+        const locationInterval = setInterval(fetchLocations, 30000);
+        return () => clearInterval(locationInterval);
     }, []);
 
     const fetchData = async () => {
@@ -62,6 +92,22 @@ const AdminDispatch = () => {
         if (validItems.length === 0) {
             alert('Please add at least one product to the dispatch');
             return;
+        }
+
+        // Validate aggregated quantities don't exceed available stock
+        const aggregated = {};
+        for (const item of validItems) {
+            if (!aggregated[item.product_id]) {
+                aggregated[item.product_id] = 0;
+            }
+            aggregated[item.product_id] += parseInt(item.quantity);
+        }
+        for (const [productId, totalQty] of Object.entries(aggregated)) {
+            const product = products.find(p => p.product_id === productId);
+            if (product && totalQty > product.filled_stock) {
+                alert(`Total allocation for ${product.size} (${totalQty}) exceeds available stock (${product.filled_stock}). Please adjust quantities.`);
+                return;
+            }
         }
         
         setSubmitting(true);
@@ -165,18 +211,65 @@ const AdminDispatch = () => {
                     </div>
 
                     <div className="dispatch-content">
-                        {/* Supervisor Locations Map Mock */}
+                        {/* Supervisor Locations Map */}
                         <div className="dispatch-section">
                             <h3 className="section-title">
                                 <MapPin size={20} />
                                 Supervisor Locations
+                                <span style={{ fontSize: '12px', color: '#888', fontWeight: '400', marginLeft: '10px' }}>
+                                    {supervisorLocations.length} active · Auto-refreshes every 30s
+                                </span>
                             </h3>
-                            <div className="location-map-mock">
-                                <p style={{ textAlign: 'center', color: '#666', padding: '40px' }}>
-                                    📍 Map View
-                                    <small></small>
-                                </p>
-                            </div>
+                            {!isLoaded ? (
+                                <div style={{ textAlign: 'center', padding: '60px', color: '#888' }}>Loading map...</div>
+                            ) : (
+                                <GoogleMap
+                                    mapContainerStyle={MAP_CONTAINER_STYLE}
+                                    center={MAP_CENTER}
+                                    zoom={11}
+                                    options={{
+                                        streetViewControl: false,
+                                        mapTypeControl: false,
+                                        fullscreenControl: true,
+                                    }}
+                                >
+                                    {supervisorLocations.map((sup) => (
+                                        <Marker
+                                            key={sup.supervisor_id}
+                                            position={{ lat: parseFloat(sup.latitude), lng: parseFloat(sup.longitude) }}
+                                            title={sup.name}
+                                            onClick={() => setSelectedMarker(sup)}
+                                        />
+                                    ))}
+
+                                    {selectedMarker && (
+                                        <InfoWindow
+                                            position={{
+                                                lat: parseFloat(selectedMarker.latitude),
+                                                lng: parseFloat(selectedMarker.longitude)
+                                            }}
+                                            onCloseClick={() => setSelectedMarker(null)}
+                                        >
+                                            <div style={{ padding: '5px', minWidth: '150px' }}>
+                                                <h4 style={{ margin: '0 0 6px 0', fontSize: '14px' }}>{selectedMarker.name}</h4>
+                                                {selectedMarker.dispatch_route && (
+                                                    <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: '#555' }}>
+                                                        📍 Route: <strong>{selectedMarker.dispatch_route}</strong>
+                                                    </p>
+                                                )}
+                                                {selectedMarker.dispatch_status && (
+                                                    <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: '#555' }}>
+                                                        🚛 Status: <strong>{selectedMarker.dispatch_status.replace('_', ' ')}</strong>
+                                                    </p>
+                                                )}
+                                                <p style={{ margin: '0', fontSize: '11px', color: '#999' }}>
+                                                    Last updated: {new Date(selectedMarker.updated_at).toLocaleTimeString()}
+                                                </p>
+                                            </div>
+                                        </InfoWindow>
+                                    )}
+                                </GoogleMap>
+                            )}
                         </div>
 
                         {/* Create Dispatch Form */}
@@ -251,6 +344,13 @@ const AdminDispatch = () => {
                                     )}
                                     {allocatedItems.map((item, index) => {
                                         const selectedProduct = products.find(p => p.product_id === item.product_id);
+                                        // Calculate how much of this product is already used in OTHER rows
+                                        const usedInOtherRows = allocatedItems
+                                            .filter((other, i) => i !== index && other.product_id === item.product_id)
+                                            .reduce((sum, other) => sum + (parseInt(other.quantity) || 0), 0);
+                                        const remainingStock = selectedProduct
+                                            ? Math.max(0, selectedProduct.filled_stock - usedInOtherRows)
+                                            : 999;
                                         return (
                                         <div key={index} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 40px', gap: '15px', marginBottom: '12px', alignItems: 'center' }}>
                                             <select
@@ -259,23 +359,31 @@ const AdminDispatch = () => {
                                                 onChange={(e) => {
                                                     const newItems = [...allocatedItems];
                                                     newItems[index].product_id = e.target.value;
+                                                    newItems[index].quantity = '';
                                                     setAllocatedItems(newItems);
                                                 }}
                                                 required
                                             >
                                                 <option value="">Select Product</option>
-                                                {products.map(product => (
-                                                    <option key={product.product_id} value={product.product_id}>
-                                                        {product.size} - {product.type} (Avail: {product.filled_stock})
-                                                    </option>
-                                                ))}
+                                                {products.map(product => {
+                                                    // Show remaining availability in dropdown
+                                                    const usedByOthers = allocatedItems
+                                                        .filter((other, i) => i !== index && other.product_id === product.product_id)
+                                                        .reduce((sum, other) => sum + (parseInt(other.quantity) || 0), 0);
+                                                    const avail = product.filled_stock - usedByOthers;
+                                                    return (
+                                                        <option key={product.product_id} value={product.product_id}>
+                                                            {product.size} - {product.type} (Avail: {avail})
+                                                        </option>
+                                                    );
+                                                })}
                                             </select>
                                             <input
                                                 type="number"
                                                 placeholder="Qty"
                                                 min="1"
-                                                max={selectedProduct?.filled_stock || 999}
-                                                style={{ padding: '10px', borderRadius: '8px', border: '1px solid #ddd' }}
+                                                max={remainingStock}
+                                                style={{ padding: '10px', borderRadius: '8px', border: `1px solid ${(parseInt(item.quantity) || 0) > remainingStock ? '#dc3545' : '#ddd'}` }}
                                                 value={item.quantity}
                                                 onChange={(e) => {
                                                     const newItems = [...allocatedItems];
@@ -284,8 +392,8 @@ const AdminDispatch = () => {
                                                 }}
                                                 required
                                             />
-                                            <span style={{ fontSize: '12px', color: '#666' }}>
-                                                {selectedProduct ? `Max: ${selectedProduct.filled_stock}` : ''}
+                                            <span style={{ fontSize: '12px', color: (parseInt(item.quantity) || 0) > remainingStock ? '#dc3545' : '#666', fontWeight: (parseInt(item.quantity) || 0) > remainingStock ? '600' : '400' }}>
+                                                {selectedProduct ? `Max: ${remainingStock}` : ''}
                                             </span>
                                             <button
                                                 type="button"

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import AdminSidebar from '../../components/AdminSidebar';
-import { Search, Edit2, Loader2, AlertCircle } from 'lucide-react';
+import { Search, Edit2, Loader2, AlertCircle, Download } from 'lucide-react';
 import { chequeApi } from '../../services/api';
 import { formatDate } from '../../utils/dateUtils';
 import '../../styles/Dealers.css';
@@ -46,6 +46,26 @@ const AdminCheques = () => {
         setSelectedCheque(cheque);
         setReturnReason('');
         setShowUpdateModal(true);
+    };
+
+    const handleExport = async () => {
+        try {
+            setUpdating(true);
+            const response = await chequeApi.exportToExcel();
+            const url = window.URL.createObjectURL(new Blob([response.data]));
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', `cheques_report_${new Date().toISOString().split('T')[0]}.xlsx`);
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+        } catch (error) {
+            console.error('Export failed:', error);
+            const errorMessage = error.response?.data?.message || 'Failed to export cheques list';
+            alert(errorMessage);
+        } finally {
+            setUpdating(false);
+        }
     };
 
     const handleUpdateStatus = async (e) => {
@@ -114,12 +134,18 @@ const AdminCheques = () => {
             <div className="dealers-container">
                 <main className="dealers-main">
                     <div className="page-header">
-                        <div>
-                            <h1 className="page-title">Cheques Management</h1>
-                            <p className="page-subtitle">Track and manage customer cheques</p>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                            <div>
+                                <h1 className="page-title">Cheques Management</h1>
+                                <p className="page-subtitle">Track and manage customer cheques</p>
+                            </div>
+                            <button className="btn btn-primary" onClick={handleExport} disabled={updating}>
+                                <Download size={20} />
+                                {updating ? 'Exporting...' : 'Export Report'}
+                            </button>
                         </div>
                     </div>
-
+                    
                     <div className="table-container">
                         <div className="table-header">
                             <h3 className="table-title">All Cheques</h3>

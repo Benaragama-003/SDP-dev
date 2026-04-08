@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import AdminSidebar from '../../components/AdminSidebar';
-import { Search, DollarSign, Calendar, Clock, CreditCard, Loader2, AlertCircle } from 'lucide-react';
+import { Search, DollarSign, Calendar, Clock, CreditCard, Loader2, AlertCircle, Download } from 'lucide-react';
 import '../../styles/Dealers.css';
 import { formatDate } from '../../utils/dateUtils';
 import DateInput from '../../components/DateInput';
@@ -91,6 +91,26 @@ const AdminCredit = () => {
         c.dealer_id?.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
+    const handleExport = async () => {
+        try {
+            setSubmitting(true);
+            const response = await creditApi.exportToExcel();
+            const url = window.URL.createObjectURL(new Blob([response.data]));
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', `credit_report_${new Date().toISOString().split('T')[0]}.xlsx`);
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+        } catch (error) {
+            console.error('Export failed:', error);
+            const errorMessage = error.response?.data?.message || 'Failed to export credits list';
+            alert(errorMessage);
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
     const handleSettlement = async (e) => {
         e.preventDefault();
 
@@ -178,9 +198,15 @@ const AdminCredit = () => {
             <div className="dealers-container">
                 <main className="dealers-main">
                     <div className="page-header">
-                        <div>
-                            <h1 className="page-title">Credit Management</h1>
-                            <p className="page-subtitle">Monitor and manage dealer credit accounts</p>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                            <div>
+                                <h1 className="page-title">Credit Management</h1>
+                                <p className="page-subtitle">Monitor and manage dealer credit accounts</p>
+                            </div>
+                            <button className="btn btn-primary" onClick={handleExport} disabled={submitting}>
+                                <Download size={20} />
+                                {submitting ? 'Exporting...' : 'Export All Accounts'}
+                            </button>
                         </div>
                     </div>
 
@@ -301,7 +327,7 @@ const AdminCredit = () => {
                 {/* Settle Modal */}
                 {showSettleModal && selectedAccount && (
                     <div className="modal-overlay" onClick={() => setShowSettleModal(false)}>
-                        <div className="modal-content" onClick={e => e.stopPropagation()} style={{ backgroundColor: '#fff', borderRadius: '20px', maxWidth: '500px', padding: '0', overflow: 'hidden', boxShadow: '0 15px 35px rgba(0,0,0,0.2)' }}>
+                        <div className="modal-content" onClick={e => e.stopPropagation()} style={{ backgroundColor: '#fff', borderRadius: '20px', maxWidth: '500px', padding: '0', overflow: 'hidden', boxShadow: '0 15px 35px rgba(0,0,0,0.2)', maxHeight: '90vh', overflowY: 'auto' }}>
                             <div className="modal-header" style={{ padding: '25px 30px', borderBottom: '1px solid #eee', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                 <h1 style={{ fontSize: '22px', fontWeight: 'bold', margin: '0', color: '#333' }}>Settle Payment</h1>
                                 <button className="modal-close" onClick={() => setShowSettleModal(false)} style={{ fontSize: '24px', border: 'none', background: 'none', cursor: 'pointer', color: '#999' }}>×</button>
@@ -368,7 +394,15 @@ const AdminCredit = () => {
                                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                                                 <input type="text" placeholder="Branch" required style={{ padding: '10px', borderRadius: '8px', border: '1px solid #ddd', outline: 'none', fontSize: '14px' }}
                                                     value={chequeDetails.branch} onChange={(e) => setChequeDetails({ ...chequeDetails, branch: e.target.value })} />
-                                                <DateInput value={chequeDetails.date} min={today} onChange={(value) => setChequeDetails({ ...chequeDetails, date: value })} required />
+                                                <div style={{ position: 'relative' }}>
+                                                    <DateInput
+                                                        value={chequeDetails.date}
+                                                        min={today}
+                                                        onChange={(value) => setChequeDetails({ ...chequeDetails, date: value })}
+                                                        required
+                                                        style={{ padding: '10px', borderRadius: '8px', border: '1px solid #ddd', outline: 'none', fontSize: '14px', width: '100%', boxSizing: 'border-box' }}
+                                                    />
+                                                </div>
                                             </div>
                                         </div>
                                     )}
@@ -379,14 +413,14 @@ const AdminCredit = () => {
                                             style={{ width: '100%', padding: '12px 15px', borderRadius: '10px', border: '1px solid #ddd', fontSize: '16px', outline: 'none' }} />
                                     </div>
                                     
-                                    <div style={{ display: 'flex', gap: '15px' }}>
+                                    <div style={{ display: 'flex', gap: '12px', marginTop: '10px' }}>
                                         <button type="button" onClick={() => setShowSettleModal(false)} disabled={submitting}
-                                            style={{ flex: 1, backgroundColor: '#dc3545', color: 'white', border: 'none', padding: '12px', borderRadius: '12px', fontSize: '16px', fontWeight: '600', cursor: 'pointer', opacity: submitting ? 0.6 : 1 }}>
+                                            style={{ flex: 1, backgroundColor: 'transparent', color: '#666', border: '2px solid #ddd', padding: '14px', borderRadius: '12px', fontSize: '15px', fontWeight: '600', cursor: 'pointer', opacity: submitting ? 0.6 : 1, transition: 'all 0.2s' }}>
                                             Cancel
                                         </button>
                                         <button type="submit" disabled={submitting}
-                                            style={{ flex: 1.5, backgroundColor: '#bfbf2a', color: 'white', border: 'none', padding: '12px', borderRadius: '12px', fontSize: '16px', fontWeight: '600', cursor: 'pointer', opacity: submitting ? 0.6 : 1 }}>
-                                            {submitting ? 'Settling...' : 'Settle Now'}
+                                            style={{ flex: 1.5, backgroundColor: '#101540', color: 'white', border: 'none', padding: '14px', borderRadius: '12px', fontSize: '15px', fontWeight: '600', cursor: 'pointer', opacity: submitting ? 0.6 : 1, transition: 'all 0.2s' }}>
+                                            {submitting ? 'Settling...' : '✓ Settle Payment'}
                                         </button>
                                     </div>
                                 </div>
@@ -449,8 +483,8 @@ const AdminCredit = () => {
                                 )}
                                 <div style={{ marginTop: '30px', textAlign: 'center' }}>
                                     <button onClick={() => setShowHistoryModal(false)}
-                                        style={{ backgroundColor: '#dc3545', color: 'white', border: 'none', padding: '12px 60px', borderRadius: '30px', fontSize: '16px', fontWeight: '600', cursor: 'pointer' }}>
-                                        Close History
+                                        style={{ backgroundColor: 'transparent', color: '#666', border: '2px solid #ddd', padding: '12px 60px', borderRadius: '30px', fontSize: '15px', fontWeight: '600', cursor: 'pointer', transition: 'all 0.2s' }}>
+                                        Close
                                     </button>
                                 </div>
                             </div>
