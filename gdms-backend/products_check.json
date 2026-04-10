@@ -1,0 +1,27 @@
+[
+  {
+    "product_id": "P_MNMK90CZJWZ8F",
+    "cylinder_size": "2kg",
+    "status": "DISCONTINUED"
+  },
+  {
+    "product_id": "P_MNMK90DCJ308L",
+    "cylinder_size": "5kg",
+    "status": "ACTIVE"
+  },
+  {
+    "product_id": "P_MNMK90DIJ6G8R",
+    "cylinder_size": "12.5kg",
+    "status": "ACTIVE"
+  },
+  {
+    "product_id": "P_MNMK90DP9FE8Z",
+    "cylinder_size": "37.5kg",
+    "status": "ACTIVE"
+  },
+  {
+    "product_id": "P88595",
+    "cylinder_size": "60kg",
+    "status": "ACTIVE"
+  }
+]

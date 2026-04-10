@@ -10,6 +10,12 @@ const AdminInventory = () => {
     const [inventoryData, setInventoryData] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showPriceUpdate, setShowPriceUpdate] = useState(false);
+    const [priceUpdateProductId, setPriceUpdateProductId] = useState('');
+    const [filledPurchasePrice, setFilledPurchasePrice] = useState('');
+    const [newPurchasePrice, setNewPurchasePrice] = useState('');
+    const [filledSellingPrice, setFilledSellingPrice] = useState('');
+    const [newSellingPrice, setNewSellingPrice] = useState('');
+    const [priceUpdateSubmitting, setPriceUpdateSubmitting] = useState(false);
     const [showDamageModal, setShowDamageModal] = useState(false);
     const [damageSubmitting, setDamageSubmitting] = useState(false);
 
@@ -46,10 +52,47 @@ const AdminInventory = () => {
         item.cylinder_size.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
-    const handlePriceUpdate = (e) => {
+    const handlePriceUpdate = async (e) => {
         e.preventDefault();
-        alert('Price updates will be implemented soon!');
-        setShowPriceUpdate(false);
+        if (!priceUpdateProductId) {
+             alert('Please select a product');
+             return;
+        }
+        
+        try {
+             setPriceUpdateSubmitting(true);
+             await productApi.updateProduct(priceUpdateProductId, {
+                 filled_purchase_price: filledPurchasePrice,
+                 new_purchase_price: newPurchasePrice,
+                 filled_selling_price: filledSellingPrice,
+                 new_selling_price: newSellingPrice
+             });
+             alert('Prices updated successfully!');
+             setShowPriceUpdate(false);
+             setPriceUpdateProductId('');
+             setFilledPurchasePrice('');
+             setNewPurchasePrice('');
+             setFilledSellingPrice('');
+             setNewSellingPrice('');
+             // Refresh products and inventory
+             if (allProducts.length > 0) fetchAllProducts();
+             fetchInventory();
+        } catch (err) {
+             alert(err?.response?.data?.message || 'Failed to update prices');
+        } finally {
+             setPriceUpdateSubmitting(false);
+        }
+    };
+
+    const openUpdatePriceModal = () => {
+        fetchAllProducts().then(() => {
+            setPriceUpdateProductId('');
+            setFilledPurchasePrice('');
+            setNewPurchasePrice('');
+            setFilledSellingPrice('');
+            setNewSellingPrice('');
+            setShowPriceUpdate(true);
+        });
     };
 
     const handleDamageReport = async (e) => {
@@ -204,7 +247,7 @@ const AdminInventory = () => {
                             <Plus size={20} />
                             Add Product
                         </button>
-                        <button className="btn btn-secondary" onClick={() => setShowPriceUpdate(true)}>
+                        <button className="btn btn-secondary" onClick={openUpdatePriceModal}>
                             <DollarSign size={20} />
                             Update Prices
                         </button>
@@ -254,12 +297,27 @@ const AdminInventory = () => {
                                     </tr>
                                 ) : (
                                     filteredData.map((item, index) => (
-                                        <tr key={index}>
-                                            <td style={{ fontWeight: '600' }}>{item.cylinder_size}</td>
-                                            <td>{item.filled || 0}</td>
-                                            <td>{item.empty || 0}</td>
+                                        <tr key={index} style={item.status !== 'ACTIVE' ? { backgroundColor: '#fff5f5' } : {}}>
+                                            <td style={{ fontWeight: '600', color: item.status !== 'ACTIVE' ? '#dc3545' : 'inherit' }}>
+                                                {item.cylinder_size}
+                                                {item.status !== 'ACTIVE' && (
+                                                    <span style={{ 
+                                                        marginLeft: '10px', 
+                                                        backgroundColor: '#dc3545', 
+                                                        color: 'white', 
+                                                        padding: '2px 8px', 
+                                                        borderRadius: '10px', 
+                                                        fontSize: '10px',
+                                                        textTransform: 'uppercase'
+                                                    }}>
+                                                        Inactive
+                                                    </span>
+                                                )}
+                                            </td>
+                                            <td style={item.status !== 'ACTIVE' ? { color: '#dc3545' } : {}}>{item.filled || 0}</td>
+                                            <td style={item.status !== 'ACTIVE' ? { color: '#dc3545' } : {}}>{item.empty || 0}</td>
                                             <td style={{ color: '#dc3545' }}>{item.damaged || 0}</td>
-                                            <td style={{ fontWeight: 'bold' }}>
+                                            <td style={{ fontWeight: 'bold', color: item.status !== 'ACTIVE' ? '#dc3545' : 'inherit' }}>
                                                 {(item.filled || 0) + (item.empty || 0) + (item.damaged || 0)}
                                             </td>
                                         </tr>
@@ -302,13 +360,19 @@ const AdminInventory = () => {
                                                     transition: 'all 0.2s'
                                                 }}
                                             >
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-                                                    <span style={{ fontWeight: '600', color: '#101540', fontSize: '14px' }}>
-                                                        {product.product_code}
-                                                    </span>
-                                                    <span style={{ color: '#555', fontSize: '14px' }}>
-                                                        {product.cylinder_size}
-                                                    </span>
+                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                                                        <span style={{ fontWeight: '600', color: '#101540', fontSize: '14px' }}>
+                                                            {product.product_code}
+                                                        </span>
+                                                        <span style={{ color: '#555', fontSize: '14px' }}>
+                                                            {product.cylinder_size}
+                                                        </span>
+                                                    </div>
+                                                    <div style={{ display: 'flex', flexDirection: 'column', fontSize: '12px', color: '#666' }}>
+                                                        <span><strong>Filled:</strong> Buy Rs.{product.filled_purchase_price || 0} | Sell Rs.{product.filled_selling_price || 0}</span>
+                                                        <span><strong>New:</strong> Buy Rs.{product.new_purchase_price || 0} | Sell Rs.{product.new_selling_price || 0}</span>
+                                                    </div>
                                                 </div>
                                                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                                                     <span
@@ -392,28 +456,57 @@ const AdminInventory = () => {
                                     <div className="form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
                                         <div className="form-field" style={{ gridColumn: '1 / -1' }}>
                                             <label>Select Cylinder Size</label>
-                                            <select required>
+                                            <select 
+                                                required 
+                                                value={priceUpdateProductId} 
+                                                onChange={(e) => {
+                                                    const prodId = e.target.value;
+                                                    setPriceUpdateProductId(prodId);
+                                                    const prod = allProducts.find(p => p.product_id === prodId);
+                                                    if (prod) {
+                                                        setFilledPurchasePrice(prod.filled_purchase_price || '');
+                                                        setNewPurchasePrice(prod.new_purchase_price || '');
+                                                        setFilledSellingPrice(prod.filled_selling_price || '');
+                                                        setNewSellingPrice(prod.new_selling_price || '');
+                                                    } else {
+                                                        setFilledPurchasePrice('');
+                                                        setNewPurchasePrice('');
+                                                        setFilledSellingPrice('');
+                                                        setNewSellingPrice('');
+                                                    }
+                                                }}
+                                            >
                                                 <option value="">Select size...</option>
-                                                {inventoryData.map((item, idx) => (
-                                                    <option key={idx} value={item.cylinder_size}>
+                                                {allProducts.map((item) => (
+                                                    <option key={item.product_id} value={item.product_id}>
                                                         {item.cylinder_size}
                                                     </option>
                                                 ))}
                                             </select>
                                         </div>
                                         <div className="form-field">
-                                            <label>Update Filled Price (Rs)</label>
-                                            <input type="number" placeholder="New price" />
+                                            <label>Filled Purchase Price (Rs)</label>
+                                            <input type="number" required placeholder="New price" value={filledPurchasePrice} onChange={e => setFilledPurchasePrice(e.target.value)} />
                                         </div>
                                         <div className="form-field">
-                                            <label>Update New Price (Rs)</label>
-                                            <input type="number" placeholder="New price" />
+                                            <label>New Purchase Price (Rs)</label>
+                                            <input type="number" required placeholder="New price" value={newPurchasePrice} onChange={e => setNewPurchasePrice(e.target.value)} />
+                                        </div>
+                                        <div className="form-field">
+                                            <label>Filled Selling Price (Rs)</label>
+                                            <input type="number" required placeholder="New price" value={filledSellingPrice} onChange={e => setFilledSellingPrice(e.target.value)} />
+                                        </div>
+                                        <div className="form-field">
+                                            <label>New Selling Price (Rs)</label>
+                                            <input type="number" required placeholder="New price" value={newSellingPrice} onChange={e => setNewSellingPrice(e.target.value)} />
                                         </div>
                                     </div>
                                 </div>
                                 <div className="modal-footer" style={{ padding: '20px', display: 'flex', justifyContent: 'flex-end', gap: '10px', borderTop: '1px solid #eee' }}>
                                     <button type="button" className="btn btn-danger" onClick={() => setShowPriceUpdate(false)}>Cancel</button>
-                                    <button type="submit" className="btn btn-primary">Update Prices</button>
+                                    <button type="submit" className="btn btn-primary" disabled={priceUpdateSubmitting}>
+                                        {priceUpdateSubmitting ? 'Updating...' : 'Update Prices'}
+                                    </button>
                                 </div>
                             </form>
                         </div>

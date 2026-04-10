@@ -238,13 +238,7 @@ const createInvoice = async (req, res, next) => {
             // Step D: Update Supervisor Performance
             await connection.execute('UPDATE supervisors SET achieved_sales = achieved_sales + ? WHERE supervisor_id = ?', [total_amount, supervisor_id]);
 
-            // Notify admins about new invoice
-            await notifyAllAdmins(connection, {
-                title: 'Invoice Created',
-                message: `Invoice ${invoice_number} created for dispatch ${dispatch_id} (Rs. ${total_amount.toLocaleString()}).`,
-                type: 'INVOICE_CREATED',
-                reference_id: invoice_id
-            });
+            // Admin notification for invoice creation removed as requested
             // Notify the supervisor who created it
             await createNotification(connection, {
                 user_id: collected_by,
@@ -748,7 +742,6 @@ const exportInvoicesToExcel = async (req, res, next) => {
             'Item Total (Rs)',
             'Invoice Total (Rs)',
             'Paid Amount (Rs)',
-            'Payment Method',
             'Status',
             'Deleted By'
         ];
@@ -818,7 +811,6 @@ const exportInvoicesToExcel = async (req, res, next) => {
                     parseFloat(invoice.total_price).toFixed(2),
                     totalAmount.toFixed(2),
                     paidAmount.toFixed(2),
-                    invoice.payment_method,
                     paymentStatus,
                     invoice.is_deleted ? (invoice.deleted_by_name || 'N/A') : '-'
                 ];
@@ -844,7 +836,7 @@ const exportInvoicesToExcel = async (req, res, next) => {
                     }
 
                     // Status color coding
-                    if (colNumber === 14) {
+                    if (colNumber === 13) {
                         const statusVal = cell.value;
                         if (statusVal === 'Paid') {
                             cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD1FAE5' } };
@@ -860,7 +852,7 @@ const exportInvoicesToExcel = async (req, res, next) => {
                     }
 
                     // Deleted By column styling
-                    if (colNumber === 15) {
+                    if (colNumber === 14) {
                         cell.alignment = { horizontal: 'center', vertical: 'middle' };
                         if (invoice.is_deleted) {
                             cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFECACA' } };

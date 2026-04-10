@@ -48,7 +48,7 @@ const getInventorySummary = async (req, res, next) => {
     }
 };
 
-// ✅ NEW FUNCTION - Inventory summary for SUPERVISORS (ACTIVE products only)
+// NEW FUNCTION - Inventory summary for SUPERVISORS (ACTIVE products only)
 const getInventorySummaryForSupervisor = async (req, res, next) => {
     try {
         const pool = await getConnection();
@@ -130,12 +130,12 @@ const createProduct = async (req, res, next) => {
                 `INSERT INTO products (product_id, product_code, cylinder_size, filled_purchase_price, new_purchase_price, filled_selling_price, new_selling_price)
                  VALUES (?, ?, ?, ?, ?, ?, ?)`,
                 [
-                    product_id, 
-                    product_code, 
-                    cylinder_size, 
-                    parseFloat(filled_purchase_price) || 0, 
-                    parseFloat(new_purchase_price) || 0, 
-                    parseFloat(filled_selling_price) || 0, 
+                    product_id,
+                    product_code,
+                    cylinder_size,
+                    parseFloat(filled_purchase_price) || 0,
+                    parseFloat(new_purchase_price) || 0,
+                    parseFloat(filled_selling_price) || 0,
                     parseFloat(new_selling_price) || 0
                 ]
             );
@@ -247,13 +247,13 @@ const toggleProductStatus = async (req, res, next) => {
 
     try {
         const pool = await getConnection();
-        
+
         // Get current status
         const [existing] = await pool.execute(
             'SELECT status FROM products WHERE product_id = ?',
             [id]
         );
-        
+
         if (existing.length === 0) {
             return errorResponse(res, 404, 'Product not found');
         }
@@ -381,7 +381,7 @@ const getInventoryMovements = async (req, res, next) => {
 
     try {
         const pool = await getConnection();
-        
+
         let query = `
             SELECT 
                 im.movement_id,
@@ -463,11 +463,14 @@ const exportInventoryToExcel = async (req, res, next) => {
                 im.quantity_change,
                 im.quantity_before,
                 im.quantity_after,
-                im.reference_id,
-                CONCAT(u.first_name, ' ', u.last_name) as created_by_name
+                COALESCE(dsp.dispatch_number, im.reference_id) AS reference_id,
+                CONCAT(u.first_name, ' ', u.last_name) as created_by_name,
+                CONCAT(sup.first_name, ' ', sup.last_name) as supervisor_name
             FROM inventory_movements im
             JOIN products p ON im.product_id = p.product_id
             LEFT JOIN users u ON im.created_by = u.user_id
+            LEFT JOIN dispatches dsp ON im.reference_id = dsp.dispatch_id
+            LEFT JOIN users sup ON dsp.supervisor_id = sup.user_id
             WHERE 1=1
         `;
         const params = [];
@@ -585,7 +588,7 @@ const exportInventoryToExcel = async (req, res, next) => {
 
             // Column headers for this group
             const colHeaderRow = movSheet.getRow(currentRow);
-            colHeaderRow.values = ['Date', 'Movement Type', 'Change', 'Balance', 'Reference'];
+            colHeaderRow.values = ['Date', 'Movement Type', 'Change', 'Balance', 'Reference (DSP No)', 'Reported By/User', 'Supervisor'];
             colHeaderRow.eachCell(cell => {
                 cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF6B21A8' } };
                 cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
@@ -608,7 +611,9 @@ const exportInventoryToExcel = async (req, res, next) => {
                     mov.movement_type.replace(/_/g, ' '),
                     changeText,
                     mov.quantity_after,
-                    mov.reference_id || '-'
+                    mov.reference_id || '-',
+                    mov.created_by_name || '-',
+                    mov.supervisor_name || '-'
                 ];
                 row.eachCell((cell, colNumber) => {
                     cell.border = {
@@ -630,7 +635,7 @@ const exportInventoryToExcel = async (req, res, next) => {
         });
 
         movSheet.columns = [
-            { width: 15 }, { width: 20 }, { width: 12 }, { width: 12 }, { width: 15 }
+            { width: 15 }, { width: 20 }, { width: 12 }, { width: 12 }, { width: 20 }, { width: 20 }, { width: 20 }
         ];
 
         // ===== SHEET 3: Empty Stock Analysis =====
@@ -662,12 +667,12 @@ const exportInventoryToExcel = async (req, res, next) => {
             const row = emptySheet.getRow(8 + idx);
             const ratio = item.filled > 0 ? (item.empty / item.filled * 100).toFixed(1) : 'N/A';
             const status = item.empty < 50 ? 'LOW' : item.empty < 100 ? 'MODERATE' : 'GOOD';
-            const notes = item.empty < 50 
-                ? 'May need to collect empties or limit refill orders' 
-                : item.empty < item.filled 
-                    ? 'Sufficient for current refill capacity' 
+            const notes = item.empty < 50
+                ? 'May need to collect empties or limit refill orders'
+                : item.empty < item.filled
+                    ? 'Sufficient for current refill capacity'
                     : 'Good empty stock for exchanges';
-            
+
             row.values = [
                 item.cylinder_size,
                 item.product_code,
@@ -704,7 +709,7 @@ const exportInventoryToExcel = async (req, res, next) => {
 
         // Filter only EMPTY type movements
         const emptyMovements = movements.filter(m => m.product_type === 'EMPTY');
-        
+
         if (emptyMovements.length > 0) {
             emptySheet.getRow(emptyMovRow).values = ['Date', 'Cylinder Size', 'Movement Type', 'Change', 'Before', 'After', 'Reference'];
             emptySheet.getRow(emptyMovRow).eachCell(cell => {
@@ -762,7 +767,7 @@ const exportInventoryToExcel = async (req, res, next) => {
 
 module.exports = {
     getInventorySummary,
-    getInventorySummaryForSupervisor, 
+    getInventorySummaryForSupervisor,
     getAllProducts,
     getActiveProducts,
     createProduct,

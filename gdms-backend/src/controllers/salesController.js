@@ -313,7 +313,8 @@ const exportSalesToExcel = async (req, res, next) => {
                 SELECT 
                     p.cylinder_size AS size,
                     ii.sale_type AS type,
-                    SUM(ii.quantity) AS quantity
+                    SUM(ii.quantity) AS quantity,
+                    SUM(ii.total_price) AS total_price
                 FROM invoice_items ii
                 JOIN invoices i ON i.invoice_id = ii.invoice_id
                 JOIN products p ON p.product_id = ii.product_id
@@ -321,7 +322,7 @@ const exportSalesToExcel = async (req, res, next) => {
                 GROUP BY p.cylinder_size, ii.sale_type
             `, itemParams);
 
-            let skuText = items.map(item => `${item.size} ${item.type}: ${item.quantity}`).join('\n');
+            let skuText = items.map(item => `${item.size} ${item.type}: ${item.quantity} (Rs. ${Number(item.total_price).toLocaleString()})`).join('\n');
             sale.sku_details = skuText || 'None';
         }
 
