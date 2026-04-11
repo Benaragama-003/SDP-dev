@@ -18,7 +18,7 @@ const AdminInventory = () => {
     const [priceUpdateSubmitting, setPriceUpdateSubmitting] = useState(false);
     const [showDamageModal, setShowDamageModal] = useState(false);
     const [damageSubmitting, setDamageSubmitting] = useState(false);
-    
+
     // Export modal state
     const [showExportModal, setShowExportModal] = useState(false);
     const [exportDates, setExportDates] = useState({ start: '', end: '' });
@@ -59,32 +59,32 @@ const AdminInventory = () => {
     const handlePriceUpdate = async (e) => {
         e.preventDefault();
         if (!priceUpdateProductId) {
-             alert('Please select a product');
-             return;
+            alert('Please select a product');
+            return;
         }
-        
+
         try {
-             setPriceUpdateSubmitting(true);
-             await productApi.updateProduct(priceUpdateProductId, {
-                 filled_purchase_price: filledPurchasePrice,
-                 new_purchase_price: newPurchasePrice,
-                 filled_selling_price: filledSellingPrice,
-                 new_selling_price: newSellingPrice
-             });
-             alert('Prices updated successfully!');
-             setShowPriceUpdate(false);
-             setPriceUpdateProductId('');
-             setFilledPurchasePrice('');
-             setNewPurchasePrice('');
-             setFilledSellingPrice('');
-             setNewSellingPrice('');
-             // Refresh products and inventory
-             if (allProducts.length > 0) fetchAllProducts();
-             fetchInventory();
+            setPriceUpdateSubmitting(true);
+            await productApi.updateProduct(priceUpdateProductId, {
+                filled_purchase_price: filledPurchasePrice,
+                new_purchase_price: newPurchasePrice,
+                filled_selling_price: filledSellingPrice,
+                new_selling_price: newSellingPrice
+            });
+            alert('Prices updated successfully!');
+            setShowPriceUpdate(false);
+            setPriceUpdateProductId('');
+            setFilledPurchasePrice('');
+            setNewPurchasePrice('');
+            setFilledSellingPrice('');
+            setNewSellingPrice('');
+            // Refresh products and inventory
+            if (allProducts.length > 0) fetchAllProducts();
+            fetchInventory();
         } catch (err) {
-             alert(err?.response?.data?.message || 'Failed to update prices');
+            alert(err?.response?.data?.message || 'Failed to update prices');
         } finally {
-             setPriceUpdateSubmitting(false);
+            setPriceUpdateSubmitting(false);
         }
     };
 
@@ -310,12 +310,12 @@ const AdminInventory = () => {
                                             <td style={{ fontWeight: '600', color: item.status !== 'ACTIVE' ? '#dc3545' : 'inherit' }}>
                                                 {item.cylinder_size}
                                                 {item.status !== 'ACTIVE' && (
-                                                    <span style={{ 
-                                                        marginLeft: '10px', 
-                                                        backgroundColor: '#dc3545', 
-                                                        color: 'white', 
-                                                        padding: '2px 8px', 
-                                                        borderRadius: '10px', 
+                                                    <span style={{
+                                                        marginLeft: '10px',
+                                                        backgroundColor: '#dc3545',
+                                                        color: 'white',
+                                                        padding: '2px 8px',
+                                                        borderRadius: '10px',
                                                         fontSize: '10px',
                                                         textTransform: 'uppercase'
                                                     }}>
@@ -465,9 +465,9 @@ const AdminInventory = () => {
                                     <div className="form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
                                         <div className="form-field" style={{ gridColumn: '1 / -1' }}>
                                             <label>Select Cylinder Size</label>
-                                            <select 
-                                                required 
-                                                value={priceUpdateProductId} 
+                                            <select
+                                                required
+                                                value={priceUpdateProductId}
                                                 onChange={(e) => {
                                                     const prodId = e.target.value;
                                                     setPriceUpdateProductId(prodId);
@@ -600,27 +600,27 @@ const AdminInventory = () => {
                             <div className="modal-body">
                                 <div className="form-group" style={{ marginBottom: '15px' }}>
                                     <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500' }}>From Date</label>
-                                    <input 
-                                        type="date" 
-                                        style={{ width: '100%', padding: '10px', borderRadius: '5px', border: '1px solid #ccc' }} 
+                                    <input
+                                        type="date"
+                                        style={{ width: '100%', padding: '10px', borderRadius: '5px', border: '1px solid #ccc' }}
                                         value={exportDates.start}
-                                        onChange={(e) => setExportDates({...exportDates, start: e.target.value})}
+                                        onChange={(e) => setExportDates({ ...exportDates, start: e.target.value })}
                                     />
                                 </div>
                                 <div className="form-group" style={{ marginBottom: '15px' }}>
                                     <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500' }}>To Date</label>
-                                    <input 
-                                        type="date" 
-                                        style={{ width: '100%', padding: '10px', borderRadius: '5px', border: '1px solid #ccc' }} 
+                                    <input
+                                        type="date"
+                                        style={{ width: '100%', padding: '10px', borderRadius: '5px', border: '1px solid #ccc' }}
                                         value={exportDates.end}
-                                        onChange={(e) => setExportDates({...exportDates, end: e.target.value})}
+                                        onChange={(e) => setExportDates({ ...exportDates, end: e.target.value })}
                                     />
                                 </div>
                             </div>
                             <div className="modal-footer" style={{ padding: '20px', display: 'flex', justifyContent: 'space-between', gap: '10px', borderTop: '1px solid #eee' }}>
                                 <button className="btn btn-secondary" style={{ flex: 1, backgroundColor: '#101540', color: 'white', padding: '10px', borderRadius: '5px', cursor: 'pointer', border: 'none' }} onClick={() => setShowExportModal(false)}>Cancel</button>
                                 <button className="btn btn-primary" style={{ flex: 1, backgroundColor: '#b4d133', color: '#101540', padding: '10px', borderRadius: '5px', cursor: 'pointer', fontWeight: 'bold', border: 'none' }} onClick={handleExportExcel}>
-                                    <Download size={16} style={{ display: 'inline', marginRight: '5px', verticalAlign: 'text-bottom' }}/>
+                                    <Download size={16} style={{ display: 'inline', marginRight: '5px', verticalAlign: 'text-bottom' }} />
                                     Export
                                 </button>
                             </div>
