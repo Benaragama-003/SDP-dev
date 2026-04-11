@@ -465,12 +465,19 @@ const exportInventoryToExcel = async (req, res, next) => {
                 im.quantity_after,
                 COALESCE(dsp.dispatch_number, im.reference_id) AS reference_id,
                 CONCAT(u.first_name, ' ', u.last_name) as created_by_name,
-                CONCAT(sup.first_name, ' ', sup.last_name) as supervisor_name
+                CONCAT(sup.first_name, ' ', sup.last_name) as supervisor_name,
+                di.damage_reason,
+                dlr.dealer_name
             FROM inventory_movements im
             JOIN products p ON im.product_id = p.product_id
             LEFT JOIN users u ON im.created_by = u.user_id
             LEFT JOIN dispatches dsp ON im.reference_id = dsp.dispatch_id
             LEFT JOIN users sup ON dsp.supervisor_id = sup.user_id
+            LEFT JOIN damage_inventory di ON
+                 (im.reference_id = di.damage_id OR im.reference_id = di.dispatch_id) 
+                 AND im.product_id = di.product_id 
+                 AND ABS(TIMESTAMPDIFF(SECOND, im.created_at, di.reported_date)) < 5
+            LEFT JOIN dealers dlr ON di.dealer_id = dlr.dealer_id
             WHERE 1=1
         `;
         const params = [];
@@ -606,12 +613,13 @@ const exportInventoryToExcel = async (req, res, next) => {
             group.movements.forEach(mov => {
                 const row = movSheet.getRow(currentRow);
                 const changeText = mov.quantity_change > 0 ? `+${mov.quantity_change}` : `${mov.quantity_change}`;
+                const refValue = (mov.reference_id && mov.reference_id.startsWith('DMG')) ? '-' : (mov.reference_id || '-');
                 row.values = [
                     new Date(mov.created_at).toLocaleDateString(),
                     mov.movement_type.replace(/_/g, ' '),
                     changeText,
                     mov.quantity_after,
-                    mov.reference_id || '-',
+                    refValue,
                     mov.created_by_name || '-',
                     mov.supervisor_name || '-'
                 ];
@@ -722,6 +730,7 @@ const exportInventoryToExcel = async (req, res, next) => {
             emptyMovements.slice(0, 50).forEach(mov => {  // Limit to 50 recent movements
                 const row = emptySheet.getRow(emptyMovRow);
                 const changeText = mov.quantity_change > 0 ? `+${mov.quantity_change}` : `${mov.quantity_change}`;
+                const refValue = (mov.reference_id && mov.reference_id.startsWith('DMG')) ? '-' : (mov.reference_id || '-');
                 row.values = [
                     new Date(mov.created_at).toLocaleDateString(),
                     mov.cylinder_size,
@@ -729,7 +738,7 @@ const exportInventoryToExcel = async (req, res, next) => {
                     changeText,
                     mov.quantity_before,
                     mov.quantity_after,
-                    mov.reference_id || '-'
+                    refValue
                 ];
                 row.eachCell((cell, colNumber) => {
                     cell.border = {
@@ -751,6 +760,65 @@ const exportInventoryToExcel = async (req, res, next) => {
 
         emptySheet.columns = [
             { width: 12 }, { width: 14 }, { width: 20 }, { width: 10 }, { width: 10 }, { width: 10 }, { width: 35 }
+        ];
+
+        // ===== SHEET 4: Damage Reports =====
+        const dmgSheet = workbook.addWorksheet('Damage Reports');
+        
+        // Company Header
+        companyHeaders.forEach((text, idx) => {
+            dmgSheet.mergeCells(`A${idx + 1}:G${idx + 1}`);
+            const row = dmgSheet.getRow(idx + 1);
+            row.getCell(1).value = text;
+            row.getCell(1).alignment = { horizontal: 'center' };
+            row.getCell(1).font = idx === 0 ? { bold: true, size: 14 } : { size: 11 };
+        });
+
+        dmgSheet.getRow(6).getCell(1).value = 'Damage Reports Summary';
+        dmgSheet.getRow(6).getCell(1).font = { bold: true, size: 12 };
+
+        const damageMovements = movements.filter(m => m.movement_type === 'DAMAGE_REPORTED' && m.product_type === 'DAMAGED');
+        
+        if (damageMovements.length > 0) {
+            dmgSheet.getRow(7).values = ['Date', 'Cylinder Size', 'Product Code', 'Damaged Quantity', 'Reference (DSP No)', 'Reported By/User', 'Dealer', 'Reason'];
+            dmgSheet.getRow(7).eachCell(cell => {
+                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDC2626' } };
+                cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+                cell.alignment = { horizontal: 'center' };
+            });
+
+            let dmgRowIdx = 8;
+            damageMovements.forEach(mov => {
+                const row = dmgSheet.getRow(dmgRowIdx);
+                const refValue = (mov.reference_id && mov.reference_id.startsWith('DMG')) ? '-' : (mov.reference_id || '-');
+                
+                row.values = [
+                    new Date(mov.created_at).toLocaleDateString(),
+                    mov.cylinder_size,
+                    mov.product_code,
+                    mov.quantity_change,
+                    refValue,
+                    mov.created_by_name || '-',
+                    mov.dealer_name || '-',
+                    mov.damage_reason || '-'
+                ];
+                row.eachCell((cell) => {
+                    cell.border = {
+                        top: { style: 'thin' },
+                        bottom: { style: 'thin' },
+                        left: { style: 'thin' },
+                        right: { style: 'thin' }
+                    };
+                });
+                dmgRowIdx++;
+            });
+        } else {
+            dmgSheet.getRow(7).getCell(1).value = 'No damage reports found for the selected period';
+            dmgSheet.getRow(7).getCell(1).font = { italic: true, color: { argb: 'FF666666' } };
+        }
+
+        dmgSheet.columns = [
+            { width: 15 }, { width: 14 }, { width: 18 }, { width: 18 }, { width: 22 }, { width: 22 }, { width: 22 }, { width: 40 }
         ];
 
         // Send file

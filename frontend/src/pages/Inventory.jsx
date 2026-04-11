@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import Sidebar from '../components/Sidebar';
 import { Search, AlertTriangle, Loader2 } from 'lucide-react';
-import api, { dispatchApi, invoiceApi } from '../services/api';
+import api, { dispatchApi, invoiceApi, dealerApi } from '../services/api';
 import '../styles/Inventory.css';
 
 
@@ -14,10 +14,12 @@ const Inventory = () => {
     const [activeDispatch, setActiveDispatch] = useState(null);
     const [dispatchItems, setDispatchItems] = useState([]);
 
+    const [dealers, setDealers] = useState([]);
     const [damageData, setDamageData] = useState({
         productId: '',
         quantity: '',
-        reason: ''
+        reason: '',
+        dealerId: ''
     });
 
         const fetchInventory = async () => {
@@ -35,7 +37,17 @@ const Inventory = () => {
     useEffect(() => {
         fetchInventory();
         fetchActiveDispatch();
+        fetchDealers();
     }, []);
+
+    const fetchDealers = async () => {
+        try {
+            const res = await dealerApi.getAllDealers();
+            setDealers(res.data.data || []);
+        } catch (err) {
+            console.error('Failed to fetch dealers', err);
+        }
+    };
 
     const fetchActiveDispatch = async () => {
         try {
@@ -64,7 +76,8 @@ const Inventory = () => {
                 dispatch_id: activeDispatch.dispatch_id,
                 product_id: damageData.productId,
                 quantity: parseInt(damageData.quantity),
-                damage_reason: damageData.reason
+                damage_reason: damageData.reason,
+                dealer_id: damageData.dealerId
             });
             alert('Damage reported successfully!');
             setShowDamageModal(false);
@@ -200,6 +213,20 @@ const Inventory = () => {
                                                 value={damageData.quantity}
                                                 onChange={(e) => setDamageData({ ...damageData, quantity: e.target.value })}
                                             />
+                                        </div>
+                                        <div className="form-field">
+                                            <label>Dealer (Optional)</label>
+                                            <select
+                                                value={damageData.dealerId}
+                                                onChange={(e) => setDamageData({ ...damageData, dealerId: e.target.value })}
+                                            >
+                                                <option value="">No Dealer / In-transit</option>
+                                                {dealers.map((d) => (
+                                                    <option key={d.dealer_id} value={d.dealer_id}>
+                                                        {d.dealer_name}
+                                                    </option>
+                                                ))}
+                                            </select>
                                         </div>
                                         <div className="form-field">
                                             <label>Reason / Notes</label>

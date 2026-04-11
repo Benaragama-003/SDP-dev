@@ -4,7 +4,7 @@ import Sidebar from '../components/Sidebar';
 import AdminSidebar from '../components/AdminSidebar';
 import { Search, Eye, Download, Calendar, User, Loader2, AlertCircle, Trash2  } from 'lucide-react';
 import { formatDate } from '../utils/dateUtils';
-import { invoiceApi } from '../services/api';
+import { invoiceApi, dealerApi } from '../services/api';
 import '../styles/Invoice.css';
 
 const InvoiceView = () => {
@@ -25,6 +25,11 @@ const InvoiceView = () => {
         dealer_name: ''
     });
     
+    // Dealers logic for autocomplete
+    const [dealers, setDealers] = useState([]);
+    const [loadingDealers, setLoadingDealers] = useState(true);
+    const [showDealerDropdown, setShowDealerDropdown] = useState(false);
+    
     // Check if user is supervisor
     const isSupervisor = user?.role === 'SUPERVISOR';
 
@@ -41,8 +46,25 @@ const InvoiceView = () => {
                 setLoading(false);
             }
         };
+        // Fetch dealers
+        const fetchDealers = async () => {
+            try {
+                const response = await dealerApi.getActiveDealers();
+                setDealers(response.data.data || []);
+            } catch (err) {
+                console.error('Error fetching dealers:', err);
+            } finally {
+                setLoadingDealers(false);
+            }
+        };
         fetchInvoices();
+        fetchDealers();
     }, []);
+
+    const filteredExportDealers = dealers.filter(d => 
+        (d.dealer_name || '').toLowerCase().includes((exportFilters.dealer_name || '').toLowerCase()) ||
+        (d.dealer_id || '').toLowerCase().includes((exportFilters.dealer_name || '').toLowerCase())
+    );
 
     const filteredInvoices = invoices.filter((invoice) => {
         const matchesSearch = 
@@ -370,7 +392,7 @@ const InvoiceView = () => {
                                     </select>
                                 </div>
 
-                                <div style={{ marginBottom: '15px' }}>
+                                <div style={{ marginBottom: '15px', position: 'relative' }}>
                                     <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500' }}>
                                         Dealer Name (Optional)
                                     </label>
@@ -378,7 +400,11 @@ const InvoiceView = () => {
                                         type="text"
                                         placeholder="Filter by dealer name..."
                                         value={exportFilters.dealer_name}
-                                        onChange={e => setExportFilters(f => ({ ...f, dealer_name: e.target.value }))}
+                                        onChange={e => {
+                                            setExportFilters(f => ({ ...f, dealer_name: e.target.value }));
+                                            setShowDealerDropdown(true);
+                                        }}
+                                        onFocus={() => setShowDealerDropdown(true)}
                                         style={{
                                             width: '100%',
                                             padding: '10px',
@@ -388,6 +414,31 @@ const InvoiceView = () => {
                                         }}
                                         disabled={exportLoading}
                                     />
+                                    {showDealerDropdown && exportFilters.dealer_name && (
+                                        <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: 'white', border: '1px solid #ddd', borderRadius: '8px', zIndex: 10, maxHeight: '200px', overflowY: 'auto', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
+                                            {loadingDealers ? (
+                                                <div style={{ padding: '10px 15px', textAlign: 'center' }}>
+                                                    <Loader2 size={20} style={{ animation: 'spin 1s linear infinite' }} />
+                                                </div>
+                                            ) : filteredExportDealers.map(dealer => (
+                                                <div
+                                                    key={dealer.dealer_id}
+                                                    onClick={() => {
+                                                        setExportFilters(f => ({ ...f, dealer_name: dealer.dealer_name }));
+                                                        setShowDealerDropdown(false);
+                                                    }}
+                                                    style={{ padding: '10px 15px', cursor: 'pointer', borderBottom: '1px solid #eee' }}
+                                                    onMouseOver={(e) => e.target.style.background = '#f5f5f5'}
+                                                    onMouseOut={(e) => e.target.style.background = 'white'}
+                                                >
+                                                    <strong>{dealer.dealer_name}</strong>
+                                                </div>
+                                            ))}
+                                            {!loadingDealers && filteredExportDealers.length === 0 && (
+                                                <div style={{ padding: '10px 15px', color: '#999' }}>No dealers found</div>
+                                            )}
+                                        </div>
+                                    )}
                                 </div>
                             </div>
 

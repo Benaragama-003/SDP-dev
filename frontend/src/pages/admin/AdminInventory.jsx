@@ -18,6 +18,10 @@ const AdminInventory = () => {
     const [priceUpdateSubmitting, setPriceUpdateSubmitting] = useState(false);
     const [showDamageModal, setShowDamageModal] = useState(false);
     const [damageSubmitting, setDamageSubmitting] = useState(false);
+    
+    // Export modal state
+    const [showExportModal, setShowExportModal] = useState(false);
+    const [exportDates, setExportDates] = useState({ start: '', end: '' });
 
     // View Products modal
     const [showProductsModal, setShowProductsModal] = useState(false);
@@ -134,7 +138,11 @@ const AdminInventory = () => {
 
     const handleExportExcel = async () => {
         try {
-            const response = await api.get('/products/export', {
+            const params = new URLSearchParams();
+            if (exportDates.start) params.append('start_date', exportDates.start);
+            if (exportDates.end) params.append('end_date', exportDates.end);
+
+            const response = await api.get(`/products/export?${params.toString()}`, {
                 responseType: 'blob'
             });
             const url = window.URL.createObjectURL(new Blob([response.data]));
@@ -145,6 +153,7 @@ const AdminInventory = () => {
             link.click();
             link.remove();
             window.URL.revokeObjectURL(url);
+            setShowExportModal(false);
         } catch (err) {
             alert('Failed to export inventory');
             console.error(err);
@@ -233,7 +242,7 @@ const AdminInventory = () => {
                                     border: 'none',
                                     cursor: 'pointer'
                                 }}
-                                onClick={handleExportExcel}
+                                onClick={() => setShowExportModal(true)}
                             >
                                 <Download size={18} />
                                 Export Excel
@@ -574,6 +583,47 @@ const AdminInventory = () => {
                                     </button>
                                 </div>
                             </form>
+                        </div>
+                    </div>
+                )}
+
+                {/* Export Inventory Modal */}
+                {showExportModal && (
+                    <div className="modal-overlay" onClick={() => setShowExportModal(false)}>
+                        <div className="modal-content" style={{ maxWidth: '400px' }} onClick={e => e.stopPropagation()}>
+                            <div className="modal-header">
+                                <h2 className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                    <Download size={20} /> Export Inventory
+                                </h2>
+                                <button className="modal-close" onClick={() => setShowExportModal(false)}>×</button>
+                            </div>
+                            <div className="modal-body">
+                                <div className="form-group" style={{ marginBottom: '15px' }}>
+                                    <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500' }}>From Date</label>
+                                    <input 
+                                        type="date" 
+                                        style={{ width: '100%', padding: '10px', borderRadius: '5px', border: '1px solid #ccc' }} 
+                                        value={exportDates.start}
+                                        onChange={(e) => setExportDates({...exportDates, start: e.target.value})}
+                                    />
+                                </div>
+                                <div className="form-group" style={{ marginBottom: '15px' }}>
+                                    <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500' }}>To Date</label>
+                                    <input 
+                                        type="date" 
+                                        style={{ width: '100%', padding: '10px', borderRadius: '5px', border: '1px solid #ccc' }} 
+                                        value={exportDates.end}
+                                        onChange={(e) => setExportDates({...exportDates, end: e.target.value})}
+                                    />
+                                </div>
+                            </div>
+                            <div className="modal-footer" style={{ padding: '20px', display: 'flex', justifyContent: 'space-between', gap: '10px', borderTop: '1px solid #eee' }}>
+                                <button className="btn btn-secondary" style={{ flex: 1, backgroundColor: '#101540', color: 'white', padding: '10px', borderRadius: '5px', cursor: 'pointer', border: 'none' }} onClick={() => setShowExportModal(false)}>Cancel</button>
+                                <button className="btn btn-primary" style={{ flex: 1, backgroundColor: '#b4d133', color: '#101540', padding: '10px', borderRadius: '5px', cursor: 'pointer', fontWeight: 'bold', border: 'none' }} onClick={handleExportExcel}>
+                                    <Download size={16} style={{ display: 'inline', marginRight: '5px', verticalAlign: 'text-bottom' }}/>
+                                    Export
+                                </button>
+                            </div>
                         </div>
                     </div>
                 )}
