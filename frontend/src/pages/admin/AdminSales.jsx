@@ -248,19 +248,16 @@ const AdminSales = () => {
                                     <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500' }}>
                                         From Date
                                     </label>
-                                    <input
-                                        type="date"
+                                    <DateInput
                                         value={exportFilters.start_date}
                                         max={new Date().toISOString().split('T')[0]}
-                                        onChange={e => setExportFilters(f => ({ ...f, start_date: e.target.value }))}
+                                        onChange={(value) => setExportFilters(f => ({ ...f, start_date: value }))}
                                         style={{
-                                            width: '100%',
                                             padding: '10px',
                                             borderRadius: '6px',
                                             border: '1px solid #ddd',
                                             fontSize: '14px'
                                         }}
-                                        disabled={exportLoading}
                                     />
                                 </div>
 
@@ -268,19 +265,16 @@ const AdminSales = () => {
                                     <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500' }}>
                                         To Date
                                     </label>
-                                    <input
-                                        type="date"
+                                    <DateInput
                                         value={exportFilters.end_date}
                                         max={new Date().toISOString().split('T')[0]}
-                                        onChange={e => setExportFilters(f => ({ ...f, end_date: e.target.value }))}
+                                        onChange={(value) => setExportFilters(f => ({ ...f, end_date: value }))}
                                         style={{
-                                            width: '100%',
                                             padding: '10px',
                                             borderRadius: '6px',
                                             border: '1px solid #ddd',
                                             fontSize: '14px'
                                         }}
-                                        disabled={exportLoading}
                                     />
                                 </div>
                             </div>

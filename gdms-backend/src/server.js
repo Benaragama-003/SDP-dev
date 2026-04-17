@@ -34,10 +34,15 @@ const API_PREFIX = process.env.API_PREFIX || '/api/v1';
 // Middleware
 app.use(helmet());
 app.use(cors({
-  origin: ['http://localhost:5173', 'http://localhost:5174'],
+  origin: [
+    'http://localhost:5173',
+    'http://localhost:5174',
+    process.env.CLIENT_URL
+  ].filter(Boolean),
   credentials: true,
   exposedHeaders: ['Content-Disposition']
 }));
+
 app.use(compression());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -77,22 +82,33 @@ app.use((req, res) => {
 // Global error handler
 app.use(errorHandler);
 
-// Start server
+// Start server — listen FIRST so Azure health probe passes, then connect DB
 const startServer = async () => {
+  // Start listening immediately so Azure's startup probe gets a response
+  app.listen(PORT, () => {
+    console.log(`Server running on http://localhost:${PORT}`);
+    console.log(`API Base: http://localhost:${PORT}${API_PREFIX}`);
+    console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+  });
+
+  // Connect to database after server is already listening
   try {
     await getConnection();
     console.log('Database connected successfully');
-
     startCreditCronJobs();
-
-    app.listen(PORT, () => {
-      console.log(`Server running on http://localhost:${PORT}`);
-      console.log(`API Base: http://localhost:${PORT}${API_PREFIX}`);
-      console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
-    });
   } catch (error) {
-    console.error('Failed to start server:', error.message);
-    process.exit(1);
+    console.error('Database connection failed:', error.message);
+    console.error('Server is running but database is not connected. Retrying in 10s...');
+    // Retry DB connection after 10 seconds
+    setTimeout(async () => {
+      try {
+        await getConnection();
+        console.log('Database reconnected successfully');
+        startCreditCronJobs();
+      } catch (retryError) {
+        console.error('Database retry failed:', retryError.message);
+      }
+    }, 10000);
   }
 };
 

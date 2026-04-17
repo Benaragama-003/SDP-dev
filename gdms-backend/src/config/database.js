@@ -11,10 +11,17 @@ const dbConfig = {
   connectionLimit: 10,
   queueLimit: 0,
   enableKeepAlive: true,
-  keepAliveInitialDelay: 0
+  keepAliveInitialDelay: 10000,
+  connectTimeout: 10000,
+  idleTimeout: 60000,        // close idle connections after 60s (Azure MySQL closes at ~600s)
+  ...(process.env.NODE_ENV === 'production' && {
+    ssl: { rejectUnauthorized: false }
+  })
 };
 
+
 let pool = null;
+let keepAliveInterval = null;
 
 const getConnection = async () => {
   try {
@@ -24,6 +31,17 @@ const getConnection = async () => {
       const connection = await pool.getConnection();
       console.log('Database connection established');
       connection.release();
+
+      // Keep-alive ping every 4 minutes to prevent Azure MySQL from closing idle connections
+      if (!keepAliveInterval) {
+        keepAliveInterval = setInterval(async () => {
+          try {
+            await pool.query('SELECT 1');
+          } catch (err) {
+            console.warn('Keep-alive ping failed:', err.message);
+          }
+        }, 4 * 60 * 1000); // 4 minutes
+      }
     }
     return pool;
   } catch (error) {

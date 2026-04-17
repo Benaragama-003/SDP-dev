@@ -5,6 +5,14 @@ const PDFDocument = require('pdfkit');
 const ExcelJS = require('exceljs');
 const { createNotification, notifyAllAdmins } = require('../utils/notificationHelper');
 
+// Helper: format date as dd/mm/yyyy
+const formatDateDDMMYYYY = (dateVal) => {
+    if (!dateVal) return '';
+    const d = new Date(dateVal);
+    if (isNaN(d.getTime())) return String(dateVal);
+    return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;
+};
+
 // Helper function to generate next sequential INV number
 const getNextINVNumber = async (connection) => {
     const [lastINV] = await connection.execute(
@@ -343,7 +351,7 @@ const softDeleteInvoice = async (req, res, next) => {
             const [dispatchRows] = await connection.execute(
                 'SELECT status FROM dispatches WHERE dispatch_id = ?', [invoice.dispatch_id]
             );
-            if (dispatchRows.length === 0 || dispatchRows[0].status !== 'IN PROGRESS') {
+            if (dispatchRows.length === 0 || dispatchRows[0].status !== 'IN_PROGRESS') {
                 await connection.rollback();
                 return res.status(400).json({ 
                     success: false, 
@@ -717,7 +725,7 @@ const exportInvoicesToExcel = async (req, res, next) => {
             'HIDELLANA DISTRIBUTORS (PVT) LTD',
             'No. 164, Kudagama Road, Hidellana, Ratnapura',
             'Tel: 045-2222865 | Reg No: PV 113085',
-            `Invoice Archive Report - Generated: ${new Date().toLocaleDateString()}`
+            `Invoice Archive Report - Generated: ${formatDateDDMMYYYY(new Date())}`
         ];
 
         companyHeaders.forEach((text, idx) => {
@@ -799,7 +807,7 @@ const exportInvoicesToExcel = async (req, res, next) => {
                 // Add actual payment method by checking payments (optional enhancement)
                 
                 row.values = [
-                    new Date(invoice.invoice_date).toLocaleDateString(),
+                    formatDateDDMMYYYY(invoice.invoice_date),
                     invoice.invoice_number,
                     invoice.dealer_name,
                     invoice.dispatch_number,

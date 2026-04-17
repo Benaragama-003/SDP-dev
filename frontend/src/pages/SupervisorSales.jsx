@@ -4,6 +4,7 @@ import { TrendingUp, Download } from 'lucide-react';
 import '../styles/Dashboard.css';
 import { formatDate } from '../utils/dateUtils';
 import { salesApi } from '../services/api';
+import DateInput from '../components/DateInput';
 
 const SupervisorSales = () => {
 
@@ -83,12 +84,13 @@ const SupervisorSales = () => {
                         </div>
                     </div>
 
-                    <input
-                        type="date"
-                        value={selectedDate}
-                        onChange={(e) => setSelectedDate(e.target.value)}
-                        className="filter-select"
-                    />
+                    <div style={{ width: '170px' }}>
+                        <DateInput
+                            value={selectedDate}
+                            onChange={(value) => setSelectedDate(value)}
+                            className="filter-select"
+                        />
+                    </div>
 
                     <div className="stats-grid">
                         <div className="stat-card">
@@ -248,19 +250,16 @@ const SupervisorSales = () => {
                                     <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500' }}>
                                         From Date
                                     </label>
-                                    <input
-                                        type="date"
+                                    <DateInput
                                         value={exportFilters.start_date}
                                         max={new Date().toISOString().split('T')[0]}
-                                        onChange={e => setExportFilters(f => ({ ...f, start_date: e.target.value }))}
+                                        onChange={(value) => setExportFilters(f => ({ ...f, start_date: value }))}
                                         style={{
-                                            width: '100%',
                                             padding: '10px',
                                             borderRadius: '6px',
                                             border: '1px solid #ddd',
                                             fontSize: '14px'
                                         }}
-                                        disabled={exportLoading}
                                     />
                                 </div>
 
@@ -268,19 +267,16 @@ const SupervisorSales = () => {
                                     <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500' }}>
                                         To Date
                                     </label>
-                                    <input
-                                        type="date"
+                                    <DateInput
                                         value={exportFilters.end_date}
                                         max={new Date().toISOString().split('T')[0]}
-                                        onChange={e => setExportFilters(f => ({ ...f, end_date: e.target.value }))}
+                                        onChange={(value) => setExportFilters(f => ({ ...f, end_date: value }))}
                                         style={{
-                                            width: '100%',
                                             padding: '10px',
                                             borderRadius: '6px',
                                             border: '1px solid #ddd',
                                             fontSize: '14px'
                                         }}
-                                        disabled={exportLoading}
                                     />
                                 </div>
                             </div>

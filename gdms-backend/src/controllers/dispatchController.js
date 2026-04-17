@@ -200,7 +200,7 @@ const getAvailableResources = async (req, res, next) => {
                 u.phone_number
             FROM supervisors s
             JOIN users u ON s.supervisor_id = u.user_id
-            WHERE s.status = 'AVAILABLE' AND u.status = 'ACTIVE'
+            WHERE s.status = 'AVAILABLE' AND u.status = 'ACTIVE' AND u.role = 'SUPERVISOR'
             ORDER BY u.first_name
         `);
 

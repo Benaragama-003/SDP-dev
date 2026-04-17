@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import AdminSidebar from '../../components/AdminSidebar';
 import { Search, Plus, DollarSign, Edit2, Loader2, AlertTriangle, Download, Package, Eye, ToggleLeft, ToggleRight } from 'lucide-react';
 import api, { productApi } from '../../services/api';
+import DateInput from '../../components/DateInput';
 import '../../styles/Inventory.css';
 
 const AdminInventory = () => {
@@ -600,20 +601,18 @@ const AdminInventory = () => {
                             <div className="modal-body">
                                 <div className="form-group" style={{ marginBottom: '15px' }}>
                                     <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500' }}>From Date</label>
-                                    <input
-                                        type="date"
-                                        style={{ width: '100%', padding: '10px', borderRadius: '5px', border: '1px solid #ccc' }}
+                                    <DateInput
                                         value={exportDates.start}
-                                        onChange={(e) => setExportDates({ ...exportDates, start: e.target.value })}
+                                        onChange={(value) => setExportDates({ ...exportDates, start: value })}
+                                        style={{ padding: '10px', borderRadius: '5px', border: '1px solid #ccc' }}
                                     />
                                 </div>
                                 <div className="form-group" style={{ marginBottom: '15px' }}>
                                     <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500' }}>To Date</label>
-                                    <input
-                                        type="date"
-                                        style={{ width: '100%', padding: '10px', borderRadius: '5px', border: '1px solid #ccc' }}
+                                    <DateInput
                                         value={exportDates.end}
-                                        onChange={(e) => setExportDates({ ...exportDates, end: e.target.value })}
+                                        onChange={(value) => setExportDates({ ...exportDates, end: value })}
+                                        style={{ padding: '10px', borderRadius: '5px', border: '1px solid #ccc' }}
                                     />
                                 </div>
                             </div>

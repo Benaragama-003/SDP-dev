@@ -3,6 +3,14 @@ const ExcelJS = require('exceljs');
 const { successResponse, errorResponse } = require('../utils/responseHelper');
 const { generateId } = require('../utils/generateId');
 
+// Helper: format date as dd/mm/yyyy
+const formatDateDDMMYYYY = (dateVal) => {
+    if (!dateVal) return '';
+    const d = new Date(dateVal);
+    if (isNaN(d.getTime())) return String(dateVal);
+    return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;
+};
+
 // Get all cheques with payment and dealer info
 const getAllCheques = async (req, res, next) => {
     try {
@@ -235,7 +243,7 @@ const exportCheques = async (req, res, next) => {
         `);
 
         if (rows.length === 0) {
-            return errorResponse(res, 404, 'No cheques found to export');
+            // Return empty spreadsheet instead of 404 (frontend expects blob)
         }
 
         const workbook = new ExcelJS.Workbook();
@@ -258,7 +266,7 @@ const exportCheques = async (req, res, next) => {
         rows.forEach((row, idx) => {
             sheet.addRow([
                 row.cheque_number,
-                new Date(row.cheque_date).toLocaleDateString(),
+                formatDateDDMMYYYY(row.cheque_date),
                 row.bank_name,
                 row.branch_name,
                 row.clearance_status,

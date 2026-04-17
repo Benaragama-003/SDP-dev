@@ -1,6 +1,14 @@
 const { getConnection } = require('../config/database');
 const ExcelJS = require('exceljs');
 
+// Helper: format date as dd/mm/yyyy
+const formatDateDDMMYYYY = (dateVal) => {
+    if (!dateVal) return '';
+    const d = new Date(dateVal);
+    if (isNaN(d.getTime())) return String(dateVal);
+    return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;
+};
+
 // GET /api/v1/sales/my-sales?date=2026-02-06
 const getMySales = async (req, res) => {
     const connection = await getConnection();
@@ -296,11 +304,7 @@ const exportSalesToExcel = async (req, res, next) => {
         `;
         const [sales] = await connection.execute(query, params);
 
-        if (sales.length === 0) {
-            return res.status(404).json({ success: false, message: 'No sales data found for the selected criteria' });
-        }
-
-        // Fetch SKU breakdowns for each sale
+        // Fetch SKU breakdowns for each sale (only if we have data)
         for (let sale of sales) {
             let itemParams = [sale.dispatch_id];
             let itemDateFilter = '';
@@ -336,7 +340,7 @@ const exportSalesToExcel = async (req, res, next) => {
         sheet.getCell('A1').alignment = { horizontal: 'center' };
 
         sheet.mergeCells('A2:K2');
-        let headerText = `Sales Report - Generated: ${new Date().toLocaleDateString()}`;
+        let headerText = `Sales Report - Generated: ${formatDateDDMMYYYY(new Date())}`;
         if (start_date && end_date) {
             headerText = `Sales from ${start_date} to ${end_date}`;
         } else if (start_date) {
@@ -363,7 +367,7 @@ const exportSalesToExcel = async (req, res, next) => {
         sales.forEach(sale => {
             const row = sheet.getRow(currentRow);
             row.values = [
-                new Date(sale.dispatch_date).toLocaleDateString(),
+                formatDateDDMMYYYY(sale.dispatch_date),
                 sale.dispatch_number || sale.dispatch_id, // Fallback if number is missing
                 sale.lorry,
                 sale.supervisor_name,

@@ -348,7 +348,7 @@ const exportCredits = async (req, res, next) => {
         `);
 
         if (credits.length === 0) {
-            return errorResponse(res, 404, 'No credit accounts found to export');
+            // Return empty spreadsheet instead of 404 (frontend expects blob)
         }
 
         const workbook = new ExcelJS.Workbook();
