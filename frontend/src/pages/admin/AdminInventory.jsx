@@ -617,8 +617,8 @@ const AdminInventory = () => {
                                 </div>
                             </div>
                             <div className="modal-footer" style={{ padding: '20px', display: 'flex', justifyContent: 'space-between', gap: '10px', borderTop: '1px solid #eee' }}>
-                                <button className="btn btn-secondary" style={{ flex: 1, backgroundColor: '#101540', color: 'white', padding: '10px', borderRadius: '5px', cursor: 'pointer', border: 'none' }} onClick={() => setShowExportModal(false)}>Cancel</button>
-                                <button className="btn btn-primary" style={{ flex: 1, backgroundColor: '#b4d133', color: '#101540', padding: '10px', borderRadius: '5px', cursor: 'pointer', fontWeight: 'bold', border: 'none' }} onClick={handleExportExcel}>
+                                <button className="btn btn-secondary" style={{ flex: 1, padding: '10px', borderRadius: '5px' }} onClick={() => setShowExportModal(false)}>Cancel</button>
+                                <button className="btn btn-primary" style={{ flex: 1, padding: '10px', borderRadius: '5px', fontWeight: 'bold' }} onClick={handleExportExcel}>
                                     <Download size={16} style={{ display: 'inline', marginRight: '5px', verticalAlign: 'text-bottom' }} />
                                     Export
                                 </button>

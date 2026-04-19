@@ -185,7 +185,7 @@ const PurchaseOrders = () => {
                                 <Download size={20} />
                                 Export Excel
                             </button>
-                            <button className="btn btn-primary" style={{ backgroundColor: '#2563eb' }} onClick={() => navigate('/admin/purchase-orders/add')}>
+                            <button className="btn btn-primary" style={{ backgroundColor: '#14246c' }} onClick={() => navigate('/admin/purchase-orders/add')}>
                                 <Plus size={20} />
                                 Create New PO
                             </button>
@@ -430,8 +430,8 @@ const PurchaseOrders = () => {
                                     <Download size={24} style={{ marginRight: '10px' }} />
                                     Export Purchase Orders
                                 </h2>
-                                <button 
-                                    className="modal-close" 
+                                <button
+                                    className="modal-close"
                                     onClick={() => !exportLoading && setShowExportModal(false)}
                                     disabled={exportLoading}
                                 >×</button>
@@ -496,22 +496,22 @@ const PurchaseOrders = () => {
                                 </div>
                             </div>
 
-                            <div className="modal-footer" style={{ 
-                                padding: '15px 20px', 
-                                display: 'flex', 
-                                justifyContent: 'flex-end', 
+                            <div className="modal-footer" style={{
+                                padding: '15px 20px',
+                                display: 'flex',
+                                justifyContent: 'flex-end',
                                 gap: '10px',
-                                borderTop: '1px solid #eee' 
+                                borderTop: '1px solid #eee'
                             }}>
-                                <button 
-                                    className="btn btn-secondary" 
+                                <button
+                                    className="btn btn-secondary"
                                     onClick={() => setShowExportModal(false)}
                                     disabled={exportLoading}
                                 >
                                     Cancel
                                 </button>
-                                <button 
-                                    className="btn btn-primary" 
+                                <button
+                                    className="btn btn-primary"
                                     onClick={handleExport}
                                     disabled={exportLoading}
                                     style={{ minWidth: '120px' }}
