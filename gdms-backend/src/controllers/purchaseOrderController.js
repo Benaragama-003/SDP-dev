@@ -696,8 +696,16 @@ const exportPurchaseOrdersToExcel = async (req, res, next) => {
                     }
 
                     // Add background color for order info columns
-                    if (colNumber <= 3) {
+                    if (colNumber <= 3 && order.order_status !== 'CANCELLED') {
                         cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF3F4F6' } };
+                    }
+
+                    // Highlight entire row if order is cancelled
+                    if (order.order_status === 'CANCELLED' && colNumber >= 1 && colNumber <= 12) {
+                        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEF2F2' } };
+                        if (colNumber !== 11) { // Keep status column its own colors
+                            cell.font = { color: { argb: 'FF7F1D1D' } };
+                        }
                     }
                 });
 
