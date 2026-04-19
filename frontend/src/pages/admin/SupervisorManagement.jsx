@@ -123,6 +123,7 @@ const SupervisorManagement = () => {
                             <thead>
                                 <tr>
                                     <th>Name</th>
+                                    <th>Role</th>
                                     <th>Target</th>
                                     <th>Account</th>
                                     <th>Work</th>
@@ -146,6 +147,13 @@ const SupervisorManagement = () => {
                             filtered.map((sup) => (
                                     <tr key={sup.user_id}>
                                         <td>{sup.full_name}</td>
+                                        <td>
+                                            {sup.role === 'ADMIN' ? (
+                                                <span className="badge" style={{ backgroundColor: '#101540', color: 'white', fontSize: '11px', padding: '4px 8px' }}>Admin</span>
+                                            ) : (
+                                                <span className="badge" style={{ backgroundColor: '#bfbf2a', color: 'white', fontSize: '11px', padding: '4px 8px' }}>Supervisor</span>
+                                            )}
+                                        </td>
                                         <td style={{ fontWeight: '500', color: '#101540' }}>
                                             Rs. {Number(sup.monthly_target || 0).toLocaleString('en-US')}
                                         </td>
@@ -183,10 +191,10 @@ const SupervisorManagement = () => {
                                                 </button>
                                                 <button
                                                     className="action-btn"
-                                                    disabled={!isFullAdmin}
+                                                    disabled={!isFullAdmin || sup.role === 'ADMIN'}
                                                     onClick={() => handlePromote(sup)}
-                                                    title="Promote to Admin"
-                                                    style={{ padding: '6px 10px', borderRadius: '6px', border: 'none', backgroundColor: isFullAdmin ? '#101540' : '#ccc', color: 'white', opacity: isFullAdmin ? 1 : 0.5 }}
+                                                    title={sup.role === 'ADMIN' ? "Already Admin" : "Promote to Admin"}
+                                                    style={{ padding: '6px 10px', borderRadius: '6px', border: 'none', backgroundColor: (isFullAdmin && sup.role !== 'ADMIN') ? '#101540' : '#ccc', color: 'white', opacity: (isFullAdmin && sup.role !== 'ADMIN') ? 1 : 0.5 }}
                                                 >
                                                     <UserPlus size={16} />
                                                 </button>
@@ -211,6 +219,10 @@ const SupervisorManagement = () => {
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 15px', backgroundColor: '#f9fafb', borderRadius: '8px' }}>
                                     <span style={{ color: '#6b7280', minWidth: '120px' }}>Full Name</span>
                                     <span style={{ fontWeight: '600', textAlign: 'right' }}>{selectedSup.full_name}</span>
+                                </div>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 15px', backgroundColor: '#f9fafb', borderRadius: '8px' }}>
+                                    <span style={{ color: '#6b7280', minWidth: '120px' }}>Role</span>
+                                    <span style={{ fontWeight: '600', textAlign: 'right' }}>{selectedSup.role === 'ADMIN' ? 'Admin' : 'Supervisor'}</span>
                                 </div>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 15px', backgroundColor: '#f9fafb', borderRadius: '8px' }}>
                                     <span style={{ color: '#6b7280', minWidth: '120px', flexShrink: 0 }}>Email</span>

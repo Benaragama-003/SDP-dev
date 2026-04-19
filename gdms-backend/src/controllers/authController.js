@@ -475,8 +475,7 @@ const getAllSupervisors = async (req, res, next) => {
                ELSE 'AVAILABLE'
              END AS work_status
       FROM users u
-      LEFT JOIN supervisors s ON u.user_id = s.supervisor_id
-      WHERE u.role = 'SUPERVISOR'
+      INNER JOIN supervisors s ON u.user_id = s.supervisor_id
       ORDER BY u.created_date DESC
     `);
     return successResponse(res, 200, 'Supervisors retrieved successfully', supervisors);
@@ -519,7 +518,10 @@ const updateSupervisorStatus = async (req, res, next) => {
 
     // Check if supervisor exists
     const [existing] = await pool.execute(
-      'SELECT user_id FROM users WHERE user_id = ? AND role = "SUPERVISOR"',
+      `SELECT u.user_id 
+       FROM users u 
+       INNER JOIN supervisors s ON u.user_id = s.supervisor_id 
+       WHERE u.user_id = ?`,
       [id]
     );
 
