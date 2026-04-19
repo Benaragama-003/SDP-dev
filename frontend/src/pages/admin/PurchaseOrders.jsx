@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import AdminSidebar from '../../components/AdminSidebar';
-import { Search, Plus, Eye, Loader } from 'lucide-react';
+import { Search, Plus, Eye, Loader, Download, Loader2 } from 'lucide-react';
 import '../../styles/Invoice.css';
 import { formatDate } from '../../utils/dateUtils';
 import { purchaseOrderApi } from '../../services/api';
+import DateInput from '../../components/DateInput';
 
 const PurchaseOrders = () => {
     const [searchTerm, setSearchTerm] = useState('');
@@ -16,6 +17,13 @@ const PurchaseOrders = () => {
     const [actionLoading, setActionLoading] = useState(false);
     const [receivedItems, setReceivedItems] = useState([]);
     const [supplierInvoiceNumber, setSupplierInvoiceNumber] = useState('');
+    const [showExportModal, setShowExportModal] = useState(false);
+    const [exportLoading, setExportLoading] = useState(false);
+    const [exportFilters, setExportFilters] = useState({
+        start_date: '',
+        end_date: '',
+        status: ''
+    });
     const navigate = useNavigate();
 
     // Fetch all purchase orders from API
@@ -120,6 +128,38 @@ const PurchaseOrders = () => {
         return map[status] || 'badge-info';
     };
 
+    const handleExport = async () => {
+        try {
+            setExportLoading(true);
+            const params = {};
+            if (exportFilters.start_date) params.start_date = exportFilters.start_date;
+            if (exportFilters.end_date) params.end_date = exportFilters.end_date;
+            if (exportFilters.status) params.status = exportFilters.status;
+
+            const response = await purchaseOrderApi.exportToExcel(params);
+
+            const blob = new Blob([response.data], {
+                type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            });
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `purchase_orders_${new Date().toISOString().split('T')[0]}.xlsx`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(url);
+
+            setShowExportModal(false);
+            setExportFilters({ start_date: '', end_date: '', status: '' });
+        } catch (error) {
+            console.error('Error exporting purchase orders:', error);
+            alert(error.response?.data?.message || 'Failed to export purchase orders');
+        } finally {
+            setExportLoading(false);
+        }
+    };
+
     const getOverview = (order) => {
         // Build a summary from total_amount and item count
         return `${order.supplier || 'Laugfs Gas'}`;
@@ -140,10 +180,16 @@ const PurchaseOrders = () => {
                             <h1 className="page-title">Purchase Orders</h1>
                             <p className="page-subtitle">Manage and track company purchase orders</p>
                         </div>
-                        <button className="btn btn-primary" onClick={() => navigate('/admin/purchase-orders/add')}>
-                            <Plus size={20} />
-                            Create New PO
-                        </button>
+                        <div style={{ display: 'flex', gap: '10px' }}>
+                            <button className="btn btn-primary" onClick={() => setShowExportModal(true)}>
+                                <Download size={20} />
+                                Export Excel
+                            </button>
+                            <button className="btn btn-primary" onClick={() => navigate('/admin/purchase-orders/add')}>
+                                <Plus size={20} />
+                                Create New PO
+                            </button>
+                        </div>
                     </div>
 
                     <div className="table-container">
@@ -370,6 +416,121 @@ const PurchaseOrders = () => {
                                         </div>
                                     </>
                                 ) : null}
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Export Modal */}
+                {showExportModal && (
+                    <div className="modal-overlay" onClick={() => !exportLoading && setShowExportModal(false)}>
+                        <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '500px' }}>
+                            <div className="modal-header">
+                                <h2 className="modal-title">
+                                    <Download size={24} style={{ marginRight: '10px' }} />
+                                    Export Purchase Orders
+                                </h2>
+                                <button 
+                                    className="modal-close" 
+                                    onClick={() => !exportLoading && setShowExportModal(false)}
+                                    disabled={exportLoading}
+                                >×</button>
+                            </div>
+
+                            <div className="modal-body" style={{ padding: '20px' }}>
+                                <div style={{ padding: '12px 16px', backgroundColor: '#f0f9ff', borderRadius: '8px', marginBottom: '20px', fontSize: '13px', color: '#0369a1', border: '1px solid #bae6fd' }}>
+                                    💡 Leave dates empty to export all purchase orders.
+                                </div>
+
+                                <div style={{ marginBottom: '15px' }}>
+                                    <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500' }}>
+                                        From Date
+                                    </label>
+                                    <DateInput
+                                        value={exportFilters.start_date}
+                                        onChange={(value) => setExportFilters(f => ({ ...f, start_date: value }))}
+                                        style={{
+                                            padding: '10px',
+                                            borderRadius: '6px',
+                                            border: '1px solid #ddd',
+                                            fontSize: '14px'
+                                        }}
+                                    />
+                                </div>
+
+                                <div style={{ marginBottom: '15px' }}>
+                                    <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500' }}>
+                                        To Date
+                                    </label>
+                                    <DateInput
+                                        value={exportFilters.end_date}
+                                        onChange={(value) => setExportFilters(f => ({ ...f, end_date: value }))}
+                                        style={{
+                                            padding: '10px',
+                                            borderRadius: '6px',
+                                            border: '1px solid #ddd',
+                                            fontSize: '14px'
+                                        }}
+                                    />
+                                </div>
+
+                                <div style={{ marginBottom: '15px' }}>
+                                    <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500' }}>
+                                        Status
+                                    </label>
+                                    <select
+                                        value={exportFilters.status}
+                                        onChange={e => setExportFilters(f => ({ ...f, status: e.target.value }))}
+                                        style={{
+                                            width: '100%',
+                                            padding: '10px',
+                                            borderRadius: '6px',
+                                            border: '1px solid #ddd',
+                                            fontSize: '14px'
+                                        }}
+                                        disabled={exportLoading}
+                                    >
+                                        <option value="">All Statuses</option>
+                                        <option value="PENDING">Pending</option>
+                                        <option value="APPROVED">Approved</option>
+                                        <option value="RECEIVED">Received</option>
+                                        <option value="CANCELLED">Cancelled</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div className="modal-footer" style={{ 
+                                padding: '15px 20px', 
+                                display: 'flex', 
+                                justifyContent: 'flex-end', 
+                                gap: '10px',
+                                borderTop: '1px solid #eee' 
+                            }}>
+                                <button 
+                                    className="btn btn-secondary" 
+                                    onClick={() => setShowExportModal(false)}
+                                    disabled={exportLoading}
+                                >
+                                    Cancel
+                                </button>
+                                <button 
+                                    className="btn btn-primary" 
+                                    onClick={handleExport}
+                                    disabled={exportLoading}
+                                    style={{ minWidth: '120px' }}
+                                >
+                                    {exportLoading ? (
+                                        <>
+                                            <Loader2 className="spinner" size={18} />
+                                            Exporting...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Download size={18} />
+                                            Export
+                                        </>
+                                    )}
+                                </button>
                             </div>
                         </div>
                     </div>
