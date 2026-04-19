@@ -1,9 +1,9 @@
 const express = require('express');
-const { 
-    getAllProducts, 
-    createProduct, 
+const {
+    getAllProducts,
+    createProduct,
     getInventorySummary,
-    getInventorySummaryForSupervisor,  // ✅ ADD THIS
+    getInventorySummaryForSupervisor,
     getActiveProducts,
     updateProduct,
     toggleProductStatus,

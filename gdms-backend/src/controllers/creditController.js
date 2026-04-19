@@ -23,6 +23,7 @@ const getAllCredits = async (req, res, next) => {
                 d.contact_number,
                 d.route,
                 d.credit_limit,
+                d.status as dealer_status,
                 COUNT(DISTINCT ct.credit_id) as total_invoices,
                 COALESCE(SUM(ct.credit_amount), 0) as total_credit,
                 COALESCE(SUM(ct.settled_amount), 0) as total_settled,
@@ -31,8 +32,7 @@ const getAllCredits = async (req, res, next) => {
                 MIN(CASE WHEN ct.remaining_balance > 0 THEN ct.due_date ELSE NULL END) as nearest_due_date
             FROM dealers d
             LEFT JOIN credit_transactions ct ON d.dealer_id = ct.dealer_id
-            WHERE d.status = 'ACTIVE'
-            GROUP BY d.dealer_id, d.dealer_name, d.contact_number, d.route, d.credit_limit
+            GROUP BY d.dealer_id, d.dealer_name, d.contact_number, d.route, d.credit_limit, d.status
             HAVING total_credit > 0 OR total_remaining > 0
             ORDER BY total_overdue DESC, total_remaining DESC
         `);
@@ -335,14 +335,14 @@ const exportCredits = async (req, res, next) => {
                 d.contact_number,
                 d.route,
                 d.credit_limit,
+                d.status as dealer_status,
                 COALESCE(SUM(ct.credit_amount), 0) as total_credit,
                 COALESCE(SUM(ct.settled_amount), 0) as total_settled,
                 COALESCE(SUM(CASE WHEN ct.remaining_balance > 0 THEN ct.remaining_balance ELSE 0 END), 0) as total_remaining,
                 COALESCE(SUM(CASE WHEN ct.status = 'OVERDUE' THEN ct.remaining_balance ELSE 0 END), 0) as total_overdue
             FROM dealers d
             LEFT JOIN credit_transactions ct ON d.dealer_id = ct.dealer_id
-            WHERE d.status = 'ACTIVE'
-            GROUP BY d.dealer_id, d.dealer_name, d.contact_number, d.route, d.credit_limit
+            GROUP BY d.dealer_id, d.dealer_name, d.contact_number, d.route, d.credit_limit, d.status
             HAVING total_credit > 0 OR total_remaining > 0
             ORDER BY total_overdue DESC, total_remaining DESC
         `);
