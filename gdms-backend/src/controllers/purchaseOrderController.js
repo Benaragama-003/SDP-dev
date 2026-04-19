@@ -341,10 +341,13 @@ const receivePurchaseOrder = async (req, res, next) => {
                 const receivedData = received_items?.find(ri => ri.order_item_id === poItem.order_item_id);
                 const receivedQty = receivedData?.received_quantity ?? poItem.ordered_quantity;
 
-                // Update PO_items with received quantity
+                // Calculate the updated item total based on the received quantity
+                const newItemTotal = receivedQty * parseFloat(poItem.unit_price);
+
+                // Update PO_items with BOTH received quantity and the new total price
                 await connection.execute(
-                    'UPDATE PO_items SET received_quantity = ? WHERE order_item_id = ?',
-                    [receivedQty, poItem.order_item_id]
+                    'UPDATE PO_items SET received_quantity = ?, total_price = ? WHERE order_item_id = ?',
+                    [receivedQty, newItemTotal, poItem.order_item_id]
                 );
 
                 if (receivedQty > 0) {
