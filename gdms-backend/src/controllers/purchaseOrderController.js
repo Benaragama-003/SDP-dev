@@ -608,6 +608,7 @@ const exportPurchaseOrdersToExcel = async (req, res, next) => {
             'Unit Price (Rs)',
             'Item Total (Rs)',
             'Order Total (Rs)',
+            'Status',
             'Created By'
         ];
 
@@ -655,6 +656,7 @@ const exportPurchaseOrdersToExcel = async (req, res, next) => {
                     parseFloat(order.unit_price).toFixed(2),
                     parseFloat(order.total_price).toFixed(2),
                     parseFloat(order.order_total).toFixed(2),
+                    order.order_status,
                     order.created_by_username
                 ];
 
@@ -677,6 +679,20 @@ const exportPurchaseOrdersToExcel = async (req, res, next) => {
                     // Format currency columns (right align)
                     if (colNumber >= 8 && colNumber <= 10) {
                         cell.alignment = { horizontal: 'right', vertical: 'middle' };
+                    }
+
+                    // Color-code status column
+                    if (colNumber === 11) {
+                        const statusColors = {
+                            'PENDING': { bg: 'FFDBEAFE', fg: 'FF1D4ED8' },
+                            'APPROVED': { bg: 'FFFEF3C7', fg: 'FFD97706' },
+                            'RECEIVED': { bg: 'FFDCFCE7', fg: 'FF166534' },
+                            'CANCELLED': { bg: 'FFFEE2E2', fg: 'FFDC2626' }
+                        };
+                        const colors = statusColors[order.order_status] || statusColors['PENDING'];
+                        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: colors.bg } };
+                        cell.font = { bold: true, color: { argb: colors.fg } };
+                        cell.alignment = { horizontal: 'center', vertical: 'middle' };
                     }
 
                     // Add background color for order info columns
@@ -708,9 +724,13 @@ const exportPurchaseOrdersToExcel = async (req, res, next) => {
                 sheet.mergeCells(`J${startRow}:J${endRow}`);
                 sheet.getCell(`J${startRow}`).alignment = { horizontal: 'right', vertical: 'middle' };
 
-                // Merge Created By (Column K)
+                // Merge Status (Column K)
                 sheet.mergeCells(`K${startRow}:K${endRow}`);
                 sheet.getCell(`K${startRow}`).alignment = { horizontal: 'center', vertical: 'middle' };
+
+                // Merge Created By (Column L)
+                sheet.mergeCells(`L${startRow}:L${endRow}`);
+                sheet.getCell(`L${startRow}`).alignment = { horizontal: 'center', vertical: 'middle' };
             }
         });
 
@@ -731,7 +751,7 @@ const exportPurchaseOrdersToExcel = async (req, res, next) => {
                 '', '', '', '', '', '', '', 'TOTALS:',
                 totalItems.toFixed(2),
                 grandTotal.toFixed(2),
-                ''
+                '', ''
             ];
 
             summaryRow.eachCell((cell, colNumber) => {
@@ -761,6 +781,7 @@ const exportPurchaseOrdersToExcel = async (req, res, next) => {
             { width: 14 },  // Unit Price
             { width: 14 },  // Item Total
             { width: 14 },  // Order Total
+            { width: 14 },  // Status
             { width: 15 }   // Created By
         ];
 

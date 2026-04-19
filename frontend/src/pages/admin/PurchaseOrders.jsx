@@ -185,7 +185,7 @@ const PurchaseOrders = () => {
                                 <Download size={20} />
                                 Export Excel
                             </button>
-                            <button className="btn btn-primary" onClick={() => navigate('/admin/purchase-orders/add')}>
+                            <button className="btn btn-primary" style={{ backgroundColor: '#2563eb' }} onClick={() => navigate('/admin/purchase-orders/add')}>
                                 <Plus size={20} />
                                 Create New PO
                             </button>
@@ -438,9 +438,6 @@ const PurchaseOrders = () => {
                             </div>
 
                             <div className="modal-body" style={{ padding: '20px' }}>
-                                <div style={{ padding: '12px 16px', backgroundColor: '#f0f9ff', borderRadius: '8px', marginBottom: '20px', fontSize: '13px', color: '#0369a1', border: '1px solid #bae6fd' }}>
-                                    💡 Leave dates empty to export all purchase orders.
-                                </div>
 
                                 <div style={{ marginBottom: '15px' }}>
                                     <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500' }}>
